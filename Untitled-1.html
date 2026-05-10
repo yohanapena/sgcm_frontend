@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sistema de Citas Médicas</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style id="app-style">
+    :root {
+      --primary: #1A6BB5;
+      --secondary: #FFFFFF;
+      --background: #E8F4FD;
+      --success: #28A745;
+      --warning: #FFC107;
+      --danger: #DC3545;
+      --border-radius: 0.5rem;
+      --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--background);
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .sidebar {
+      background-color: var(--secondary);
+      width: 250px;
+      height: 100vh;
+      position: fixed;
+      left: 0;
+      top: 0;
+      box-shadow: var(--shadow);
+      z-index: 1000;
+      transition: all 0.3s ease;
+    }
+    
+    .sidebar-header {
+      padding: 20px;
+      text-align: center;
+      color: var(--primary);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    .sidebar-menu {
+      padding: 0;
+      list-style-type: none;
+      margin-top: 20px;
+    }
+    
+    .sidebar-item {
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      color: #333;
+      text-decoration: none;
+    }
+    
+    .sidebar-item:hover {
+      background-color: rgba(26, 107, 181, 0.1);
+    }
+    
+    .sidebar-item.active {
+      background-color: var(--primary);
+      color: white;
+      border-right: 4px solid var(--primary);
+    }
+    
+    .sidebar-item i {
+      margin-right: 10px;
+      width: 20px;
+      text-align: center;
+    }
+    
+    .main-content {
+      margin-left: 250px;
+      padding: 20px;
+      min-height: 100vh;
+      transition: all 0.3s;
+    }
+    
+    .topbar {
+      background-color: var(--secondary);
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow);
+      border-radius: var(--border-radius);
+      margin-bottom: 20px;
+    }
+    
+    .user-info {
+      display: flex;
+      align-items: center;
+    }
+    
+    .user-info img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      margin-right: 10px;
+    }
+    
+    .user-role {
+      font-size: 0.8rem;
+      color: #666;
+    }
+    
+    .card {
+      background-color: var(--secondary);
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+      border: none;
+      margin-bottom: 20px;
+    }
+    
+    .card-header {
+      background-color: var(--primary);
+      color: var(--secondary);
+      border-top-left-radius: var(--border-radius);
+      border-top-right-radius: var(--border-radius);
+      padding: 15px 20px;
+      font-weight: 600;
+    }
+    
+    .badge-success {
+      background-color: var(--success);
+      color: white;
+    }
+    
+    .badge-warning {
+      background-color: var(--warning);
+      color: #212529;
+    }
+    
+    .badge-danger {
+      background-color: var(--danger);
+      color: white;
+    }
+    
+    .badge-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+    
+    .btn-primary {
+      background-color: var(--primary);
+      border-color: var(--primary);
+    }
+    
+    .btn-primary:hover {
+      background-color: #155a9c;
+      border-color: #155a9c;
+    }
+    
+    .login-container {
+      max-width: 400px;
+      margin: 100px auto;
+      padding: 30px;
+      background-color: var(--secondary);
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+    }
+    
+    .login-logo {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .login-logo img {
+      width: 100px;
+      height: 100px;
+      object-fit: contain;
+    }
+    
+    .content-section {
+      display: none;
+    }
+    
+    .content-section.active {
+      display: block;
+    }
+    
+    .timeline {
+      position: relative;
+      padding: 20px 0;
+    }
+    
+    .timeline-item {
+      position: relative;
+      padding-left: 50px;
+      padding-bottom: 20px;
+    }
+    
+    .timeline-item:before {
+      content: "";
+      position: absolute;
+      left: 20px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background-color: #e9ecef;
+    }
+    
+    .timeline-item:after {
+      content: "";
+      position: absolute;
+      left: 16px;
+      top: 8px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--primary);
+    }
+    
+    .stats-card {
+      text-align: center;
+      padding: 20px;
+      border-radius: var(--border-radius);
+      color: white;
+    }
+    
+    .stats-card.primary {
+      background-color: var(--primary);
+    }
+    
+    .stats-card.success {
+      background-color: var(--success);
+    }
+    
+    .stats-card.warning {
+      background-color: var(--warning);
+      color: #212529;
+    }
+    
+    .stats-value {
+      font-size: 2rem;
+      font-weight: bold;
+    }
+    
+    .stats-label {
+      font-size: 1rem;
+    }
+    
+    .appointment-list {
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    
+    .appointment-item {
+      padding: 15px;
+      margin-bottom: 10px;
+      border-radius: var(--border-radius);
+      background-color: white;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .appointment-time {
+      font-weight: bold;
+      color: var(--primary);
+    }
+    
+    .calendar-container {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    
+    .calendar-day {
+      flex: 1;
+      min-width: 120px;
+      padding: 10px;
+      background-color: white;
+      border-right: 1px solid #e9ecef;
+      text-align: center;
+    }
+    
+    .calendar-day:last-child {
+      border-right: none;
+    }
+    
+    .calendar-day-name {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: var(--primary);
+    }
+    
+    .time-slot {
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .time-slot.available {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+    }
+    
+    .time-slot.unavailable {
+      background-color: #ffebee;
+      color: #c62828;
+      text-decoration: line-through;
+      cursor: not-allowed;
+    }
+    
+    .time-slot.selected {
+      background-color: var(--primary);
+      color: white;
+    }
+    
+    .wizard-step {
+      display: none;
+    }
+    
+    .wizard-step.active {
+      display: block;
+    }
+    
+    .wizard-nav {
+      display: flex;
+      margin-bottom: 20px;
+    }
+    
+    .wizard-nav-item {
+      flex: 1;
+      text-align: center;
+      padding: 15px;
+      background-color: #e9ecef;
+      border-right: 1px solid white;
+      position: relative;
+    }
+    
+    .wizard-nav-item:last-child {
+      border-right: none;
+    }
+    
+    .wizard-nav-item.active {
+      background-color: var(--primary);
+      color: white;
+    }
+    
+    .wizard-nav-item.completed {
+      background-color: #a1cdf1;
+    }
+    
+    .wizard-nav-item.active:after {
+      content: "";
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-top: 10px solid var(--primary);
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 70px;
+      }
+      
+      .sidebar-item span {
+        display: none;
+      }
+      
+      .main-content {
+        margin-left: 70px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Section -->
+  <section id="login-section" class="content-section active">
+    <div class="login-container">
+      <div class="login-logo">
+        <i class="fas fa-hospital fa-5x text-primary"></i>
+        <h2 class="mt-3 text-primary">Sistema de Citas Médicas</h2>
+      </div>
+      <form id="login-form">
+        <div class="mb-3">
+          <label for="username" class="form-label">Usuario</label>
+          <input type="text" class="form-control" id="username" required>
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Contraseña</label>
+          <input type="password" class="form-control" id="password" required>
+        </div>
+        <div class="alert alert-danger d-none" id="login-error">
+          Usuario o contraseña incorrectos
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Iniciar Sesión</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Main App Section (hidden initially) -->
+  <section id="app-section" class="content-section">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h4>Sistema de Citas</h4>
+      </div>
+      <ul class="sidebar-menu">
+        <li class="sidebar-item" data-section="dashboard" id="nav-dashboard">
+          <i class="fas fa-tachometer-alt"></i>
+          <span>Dashboard</span>
+        </li>
+        <li class="sidebar-item" data-section="patients" id="nav-patients">
+          <i class="fas fa-user-injured"></i>
+          <span>Pacientes</span>
+        </li>
+        <li class="sidebar-item" data-section="appointments" id="nav-appointments">
+          <i class="fas fa-calendar-alt"></i>
+          <span>Citas</span>
+        </li>
+        <li class="sidebar-item" data-section="clinical-history" id="nav-clinical-history">
+          <i class="fas fa-notes-medical"></i>
+          <span>Historia Clínica</span>
+        </li>
+        <li class="sidebar-item" data-section="services" id="nav-services">
+          <i class="fas fa-stethoscope"></i>
+          <span>Servicios</span>
+        </li>
+        <li class="sidebar-item" data-section="users" id="nav-users">
+          <i class="fas fa-users-cog"></i>
+          <span>Usuarios</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Topbar -->
+      <div class="topbar">
+        <div class="user-info">
+          <img src="https://cdn.pixabay.com/photo/2016/08/08/09/17/avatar-1577909_960_720.png" alt="User Avatar">
+          <div>
+            <div class="user-name" id="user-name">Nombre de Usuario</div>
+            <div class="user-role" id="user-role">Rol</div>
+          </div>
+        </div>
+        <button class="btn btn-outline-danger" id="logout-btn">
+          <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+        </button>
+      </div>
+
+      <!-- Dashboard Section -->
+      <div id="dashboard-section" class="content-section">
+        <h2 class="mb-4">Dashboard Médico</h2>
+        
+        <div class="row mb-4">
+          <div class="col-md-4">
+            <div class="stats-card primary">
+              <div class="stats-value">8</div>
+              <div class="stats-label">Citas Hoy</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="stats-card success">
+              <div class="stats-value">3</div>
+              <div class="stats-label">Atendidas</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="stats-card warning">
+              <div class="stats-value">5</div>
+              <div class="stats-label">Pendientes</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-header">
+            <i class="fas fa-calendar-day"></i> Citas de Hoy
+          </div>
+          <div class="card-body">
+            <div class="appointment-list">
+              <div class="appointment-item">
+                <div>
+                  <div class="appointment-time">08:00 AM</div>
+                  <div>María González</div>
+                </div>
+                <div>
+                  <span class="badge badge-primary">Agendada</span>
+                  <button class="btn btn-sm btn-primary ms-2">Registrar Consulta</button>
+                </div>
+              </div>
+              <div class="appointment-item">
+                <div>
+                  <div class="appointment-time">09:00 AM</div>
+                  <div>Juan Pérez</div>
+                </div>
+                <div>
+                  <span class="badge badge-success">Atendida</span>
+                </div>
+              </div>
+              <div class="appointment-item">
+                <div>
+                  <div class="appointment-time">10:00 AM</div>
+                  <div>Pedro Ramírez</div>
+                </div>
+                <div>
+                  <span class="badge badge-primary">Agendada</span>
+                  <button class="btn btn-sm btn-primary ms-2">Registrar Consulta</button>
+                </div>
+              </div>
+              <div class="appointment-item">
+                <div>
+                  <div class="appointment-time">11:00 AM</div>
+                  <div>Laura Gómez</div>
+                </div>
+                <div>
+                  <span class="badge badge-danger">Cancelada</span>
+                </div>
+              </div>
+              <div class="appointment-item">
+                <div>
+                  <div class="appointment-time">12:00 PM</div>
+                  <div>Carlos Torres</div>
+                </div>
+                <div>
+                  <span class="badge badge-success">Atendida</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Patients Section -->
+      <div id="patients-section" class="content-section">
+        <h2 class="mb-4">Registro de Pacientes</h2>
+        
+        <div class="card">
+          <div class="card-header">
+            <i class="fas fa-user-plus"></i> Nuevo Paciente
+          </div>
+          <div class="card-body">
+            <form id="patient-form">
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <label class="form-label">Número de Identificación</label>
+                  <input type="text" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Fecha de Nacimiento</label>
+                  <input type="date" class="form-control" required>
+                </div>
+              </div>
+              
+              <div class="row mb-3">
+                <div class="col-md-4">
+                  <label class="form-label">Nombre</label>
+                  <input type="text" class="form-control" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Primer Apellido</label>
+                  <input type="text" class="form-control" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Segundo Apellido</label>
+                  <input type="text" class="form-control">
+                </div>
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label">Dirección</label>
+                <input type="text" class="form-control">
+              </div>
+              
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <label class="form-label">EPS</label>
+                  <select class="form-select">
+                    <option selected disabled>Seleccione EPS</option>
+                    <option>Nueva EPS</option>
+                    <option>Sura EPS</option>
+                    <option>Sanitas EPS</option>
+                    <option>Compensar EPS</option>
+                    <option>Famisanar EPS</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Régimen</label>
+                  <select class="form-select">
+                    <option selected disabled>Seleccione Régimen</option>
+                    <option>Contributivo</option>
+                    <option>Subsidiado</option>
+                    <option>Especial</option>
+                    <option>Excepción</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="card mb-3">
+                <div class="card-header">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span>Datos de Contacto</span>
+                    <button type="button" class="btn btn-sm btn-primary">
+                      <i class="fas fa-plus"></i> Agregar Contacto
+                    </button>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="contact-list">
+                    <div class="row mb-2">
+                      <div class="col-md-4">
+                        <select class="form-select">
+                          <option>celular</option>
+                          <option>fijo</option>
+                          <option>email</option>
+                          <option>whatsapp</option>
+                        </select>
+                      </div>
+                      <div class="col-md-7">
+                        <input type="text" class="form-control" placeholder="Dato de contacto">
+                      </div>
+                      <div class="col-md-1">
+                        <button type="button" class="btn btn-sm btn-danger">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-secondary me-2">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Guardar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Appointments Section -->
+      <div id="appointments-section" class="content-section">
+        <h2 class="mb-4">Agendamiento de Citas</h2>
+        
+        <div class="card">
+          <div class="card-header">
+            <i class="fas fa-calendar-plus"></i> Nueva Cita
+          </div>
+          <div class="card-body">
+            <div class="wizard-nav">
+              <div class="wizard-nav-item active">1. Paciente</div>
+              <div class="wizard-nav-item">2. Especialidad</div>
+              <div class="wizard-nav-item">3. Médico</div>
+              <div class="wizard-nav-item">4. Horario</div>
+              <div class="wizard-nav-item">5. Confirmar</div>
+            </div>
+            
+            <!-- Step 1: Patient Search -->
+            <div class="wizard-step active" id="step-patient">
+              <div class="mb-4">
+                <label class="form-label">Buscar Paciente</label>
+                <div class="input-group">
+                  <input type="text" class="form-control" placeholder="Número de identificación o nombre">
+                  <button class="btn btn-primary">
+                    <i class="fas fa-search"></i> Buscar
+                  </button>
+                </div>
+              </div>
+              
+              <div class="table-responsive">
+                <table class="table table-striped">
+                  <thead>
+                    <tr>
+                      <th>Identificación</th>
+                      <th>Nombre</th>
+                      <th>Apellidos</th>
+                      <th>EPS</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>1020304050</td>
+                      <td>María</td>
+                      <td>González López</td>
+                      <td>Nueva EPS</td>
+                      <td>
+                        <button class="btn btn-sm btn-primary">Seleccionar</button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>6070809010</td>
+                      <td>Juan</td>
+                      <td>Pérez García</td>
+                      <td>Sura EPS</td>
+                      <td>
+                        <button class="btn btn-sm btn-primary">Seleccionar</button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              
+              <div class="d-flex justify-content-between mt-4">
+                <button class="btn btn-secondary" disabled>Anterior</button>
+                <button class="btn btn-primary">Siguiente</button>
+              </div>
+            </div>
+            
+            <!-- Step 2: Specialty Selection -->
+            <div class="wizard-step" id="step-specialty">
+              <h5 class="mb-3">Seleccionar Especialidad</h5>
+              
+              <div class="row">
+                <div class="col-md-4 mb-3">
+                  <div class="card h-100">
+                    <div class="card-body text-center">
+                      <i class="fas fa-user-md fa-3x mb-3 text-primary"></i>
+                      <h5>Medicina General</h5>
+                      <button class="btn btn-sm btn-primary mt-2">Seleccionar</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                  <div class="card h-100">
+                    <div class="card-body text-center">
+                      <i class="fas fa-tooth fa-3x mb-3 text-primary"></i>
+                      <h5>Odontología</h5>
+                      <button class="btn btn-sm btn-primary mt-2">Seleccionar</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                  <div class="card h-100">
+                    <div class="card-body text-center">
+                      <i class="fas fa-heartbeat fa-3x mb-3 text-primary"></i>
+                      <h5>Cardiología</h5>
+                      <button class="btn btn-sm btn-primary mt-2">Seleccionar</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="d-flex justify-content-between mt-4">
+                <button class="btn btn-secondary">Anterior</button>
+                <button class="btn btn-primary">Siguiente</button>
+              </div>
+            </div>
+            
+            <!-- Step 3: Doctor Selection -->
+            <div class="wizard-step" id="step-doctor">
+              <h5 class="mb-3">Seleccionar Médico</h5>
+              
+              <div class="row">
+                <div class="col-md-4 mb-3">
+                  <div class="card h-100">
+                    <div class="card-body text-center">
+                      <img src="https://cdn.pixabay.com/photo/2017/01/31/22/32/doctor-2027768_960_720.png" alt="Doctor" class="img-fluid rounded-circle mb-3" style="width: 100px; height: 100px; object-fit: cover;">
+                      <h5>Dr. Carlos Rodríguez</h5>
+                      <p class="text-muted">Medicina General</p>
+                      <button class="btn btn-sm btn-primary mt-2">Seleccionar</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                  <div class="card h-100">
+                    <div class="card-body text-center">
+                      <img src="https://cdn.pixabay.com/photo/2020/11/03/15/31/doctor-5710160_960_720.png" alt="Doctor" class="img-fluid rounded-circle mb-3" style="width: 100px; height: 100px; object-fit: cover;">
+                      <h5>Dra. Sofía Torres</h5>
+                      <p class="text-muted">Medicina General</p>
+                      <button class="btn btn-sm btn-primary mt-2">Seleccionar</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="d-flex justify-content-between mt-4">
+                <button class="btn btn-secondary">Anterior</button>
+                <button class="btn btn-primary">Siguiente</button>
+              </div>
+            </div>
+            
+            <!-- Step 4: Schedule Selection -->
+            <div class="wizard-step" id="step-schedule">
+              <h5 class="mb-3">Seleccionar Horario</h5>
+              
+              <div class="calendar-container">
+                <div class="calendar-day">
+                  <div class="calendar-day-name">Lunes</div>
+                  <div class="time-slot available">08:00 AM</div>
+                  <div class="time-slot available">09:00 AM</div>
+                  <div class="time-slot unavailable">10:00 AM</div>
+                  <div class="time-slot available">11:00 AM</div>
+                  <div class="time-slot unavailable">12:00 PM</div>
+                </div>
+                <div class="calendar-day">
+                  <div class="calendar-day-name">Martes</div>
+                  <div class="time-slot unavailable">08:00 AM</div>
+                  <div class="time-slot available">09:00 AM</div>
+                  <div class="time-slot available">10:00 AM</div>
+                  <div class="time-slot available">11:00 AM</div>
+                  <div class="time-slot available">12:00 PM</div>
+                </div>
+                <div class="calendar-day">
+                  <div class="calendar-day-name">Miércoles</div>
+                  <div class="time-slot available">08:00 AM</div>
+                  <div class="time-slot available">09:00 AM</div>
+                  <div class="time-slot unavailable">10:00 AM</div>
+                  <div class="time-slot unavailable">11:00 AM</div>
+                  <div class="time-slot available">12:00 PM</div>
+                </div>
+                <div class="calendar-day">
+                  <div class="calendar-day-name">Jueves</div>
+                  <div class="time-slot unavailable">08:00 AM</div>
+                  <div class="time-slot unavailable">09:00 AM</div>
+                  <div class="time-slot available">10:00 AM</div>
+                  <div class="time-slot available">11:00 AM</div>
+                  <div class="time-slot available">12:00 PM</div>
+                </div>
+                <div class="calendar-day">
+                  <div class="calendar-day-name">Viernes</div>
+                  <div class="time-slot available">08:00 AM</div>
+                  <div class="time-slot unavailable">09:00 AM</div>
+                  <div class="time-slot available">10:00 AM</div>
+                  <div class="time-slot available">11:00 AM</div>
+                  <div class="time-slot available">12:00 PM</div>
+                </div>
+              </div>
+              
+              <div class="d-flex justify-content-between mt-4">
+                <button class="btn btn-secondary">Anterior</button>
+                <button class="btn btn-primary">Siguiente</button>
+              </div>
+            </div>
+            
+            <!-- Step 5: Confirmation -->
+            <div class="wizard-step" id="step-confirm">
+              <h5 class="mb-3">Confirmar Cita</h5>
+              
+              <div class="card mb-4">
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col-md-6">
+                      <p><strong>Paciente:</strong> María González López</p>
+                      <p><strong>Identificación:</strong> 1020304050</p>
+                      <p><strong>EPS:</strong> Nueva EPS</p>
+                    </div>
+                    <div class="col-md-6">
+                      <p><strong>Médico:</strong> Dr. Carlos Rodríguez</p>
+                      <p><strong>Especialidad:</strong> Medicina General</p>
+                      <p><strong>Fecha y hora:</strong> Lunes, 08:00 AM</p>
+                    </div>
+                  </div>
+                  
+                  <div class="form-group mt-3">
+                    <label class="form-label">Observaciones</label>
+                    <textarea class="form-control" rows="3"></textarea>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="d-flex justify-content-between">
+                <button class="btn btn-secondary">Anterior</button>
+                <button class="btn btn-success">Confirmar Cita</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Clinical History Section -->
+      <div id="clinical-history-section" class="content-section">
+        <h2 class="mb-4">Historia Clínica</h2>
+        
+        <div class="card mb-4">
+          <div class="card-header">
+            <i class="fas fa-search"></i> Buscar Paciente
+          </div>
+          <div class="card-body">
+            <div class="input-group">
+              <input type="text" class="form-control" placeholder="Número de identificación o nombre">
+              <button class="btn btn-primary">
+                <i class="fas fa-search"></i> Buscar
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card mb-4">
+          <div class="card-header">
+            <i class="fas fa-user"></i> Información del Paciente
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-4">
+                <p><strong>Nombre:</strong> María González López</p>
+                <p><strong>Identificación:</strong> 1020304050</p>
+                <p><strong>Fecha de nacimiento:</strong> 15/03/1985</p>
+              </div>
+              <div class="col-md-4">
+                <p><strong>EPS:</strong> Nueva EPS</p>
+                <p><strong>Régimen:</strong> Contributivo</p>
+                <p><strong>Dirección:</strong> Calle 123 #45-67</p>
+              </div>
+              <div class="col-md-4">
+                <p><strong>Contactos:</strong></p>
+                <p><i class="fas fa-mobile-alt"></i> 321-456-7890</p>
+                <p><i class="fas fa-envelope"></i> maria@example.com</p>
+                <p><i class="fab fa-whatsapp"></i> 321-456-7890</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+              <span><i class="fas fa-file-medical"></i> Historia Clínica</span>
+              <button class="btn btn-sm btn-primary" id="new-consultation-btn">
+                <i class="fas fa-plus"></i> Registrar Consulta
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="timeline">
+              <div class="timeline-item">
+                <div class="card mb-3">
+                  <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between">
+                      <span>10/06/2023 - Dr. Carlos Rodríguez - Medicina General</span>
+                      <span class="badge badge-primary">Consulta</span>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p><strong>Diagnóstico:</strong> Hipertensión arterial</p>
+                    <p><strong>Observación:</strong> Paciente presenta presión arterial elevada. Se recomienda control periódico y tratamiento farmacológico.</p>
+                    <p><strong>Servicios:</strong> Toma de presión arterial, Electrocardiograma</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="timeline-item">
+                <div class="card mb-3">
+                  <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between">
+                      <span>05/03/2023 - Dra. Sofía Torres - Medicina General</span>
+                      <span class="badge badge-primary">Consulta</span>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p><strong>Diagnóstico:</strong> Faringitis aguda</p>
+                    <p><strong>Observación:</strong> Paciente presenta dolor de garganta e inflamación. Se recomienda antibiótico por 7 días.</p>
+                    <p><strong>Servicios:</strong> Examen físico</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="timeline-item">
+                <div class="card">
+                  <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between">
+                      <span>15/12/2022 - Dr. Carlos Rodríguez - Medicina General</span>
+                      <span class="badge badge-primary">Consulta</span>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p><strong>Diagnóstico:</strong> Infección respiratoria aguda</p>
+                    <p><strong>Observación:</strong> Paciente presenta síntomas de gripe y congestión nasal. Se recomienda reposo y medicación sintomática.</p>
+                    <p><strong>Servicios:</strong> Examen físico, Prueba de COVID-19</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Services Section -->
+      <div id="services-section" class="content-section">
+        <h2 class="mb-4">Servicios Médicos</h2>
+        
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <div class="card">
+              <div class="card-header">
+                <i class="fas fa-heartbeat"></i> Cardiología
+              </div>
+              <div class="card-body">
+                <p>Servicios de diagnóstico y tratamiento de enfermedades del corazón y sistema circulatorio.</p>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item">Electrocardiograma</li>
+                  <li class="list-group-item">Ecocardiograma</li>
+                  <li class="list-group-item">Prueba de esfuerzo</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-md-4 mb-3">
+            <div class="card">
+              <div class="card-header">
+                <i class="fas fa-x-ray"></i> Radiología
+              </div>
+              <div class="card-body">
+                <p>Servicios de diagnóstico por imágenes para diversas condiciones médicas.</p>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item">Rayos X</li>
+                  <li class="list-group-item">Ecografía</li>
+                  <li class="list-group-item">Tomografía</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-md-4 mb-3">
+            <div class="card">
+              <div class="card-header">
+                <i class="fas fa-flask"></i> Laboratorio Clínico
+              </div>
+              <div class="card-body">
+                <p>Análisis de muestras biológicas para diagnóstico y seguimiento de condiciones.</p>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item">Hemograma</li>
+                  <li class="list-group-item">Química sanguínea</li>
+                  <li class="list-group-item">Uroanálisis</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Users Section -->
+      <div id="users-section" class="content-section">
+        <h2 class="mb-4">Administración de Usuarios</h2>
+        
+        <div class="card">
+          <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+              <span><i class="fas fa-users-cog"></i> Usuarios del Sistema</span>
+              <button class="btn btn-sm btn-primary" id="new-user-btn">
+                <i class="fas fa-plus"></i> Nuevo Usuario
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped" id="users-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="users-table-body">
+                  <!-- Dynamically populated from JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Modal: Register Consultation -->
+  <div class="modal fade" id="consultationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title">Registrar Consulta</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="consultation-form">
+            <div class="mb-3">
+              <label class="form-label">Diagnóstico</label>
+              <textarea class="form-control" rows="3" required></textarea>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Observaciones</label>
+              <textarea class="form-control" rows="3" required></textarea>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Servicios</label>
+              <select class="form-select" multiple>
+                <option>Examen físico</option>
+                <option>Toma de presión arterial</option>
+                <option>Electrocardiograma</option>
+                <option>Prueba de COVID-19</option>
+                <option>Hemograma</option>
+                <option>Rayos X</option>
+                <option>Ecografía</option>
+              </select>
+              <div class="form-text">Mantén presionada la tecla Ctrl para seleccionar múltiples servicios.</div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: User Management -->
+  <div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="userModalTitle">Nuevo Usuario</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="user-form">
+            <input type="hidden" id="user-id">
+            <div class="mb-3">
+              <label class="form-label">Usuario</label>
+              <input type="text" class="form-control" id="user-username" required>
+              <div class="invalid-feedback">Este campo es requerido</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Contraseña</label>
+              <input type="password" class="form-control" id="user-password">
+              <div class="form-text" id="password-help">Dejar en blanco para mantener la contraseña actual (solo al editar)</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Rol</label>
+              <select class="form-select" id="user-role" required>
+                <option value="" selected disabled>Seleccione un rol</option>
+                <option value="Administrativo">Administrativo</option>
+                <option value="Medico">Médico</option>
+              </select>
+              <div class="invalid-feedback">Este campo es requerido</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Estado</label>
+              <select class="form-select" id="user-status" required>
+                <option value="Activo" selected>Activo</option>
+                <option value="Inactivo">Inactivo</option>
+              </select>
+            </div>
+            <div class="mb-3" id="doctor-association-container">
+              <label class="form-label">Asociar a Médico</label>
+              <select class="form-select" id="user-doctor-id">
+                <option value="" selected>Seleccione un médico (opcional)</option>
+                <!-- Dynamically populated from JS -->
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="save-user-btn">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script id="app-script">
+    $(document).ready(function() {
+      // Handle login form submission
+      $('#login-form').on('submit', function(e) {
+        e.preventDefault();
+        const username = $('#username').val();
+        const password = $('#password').val();
+        
+        // Simulate login authentication
+        if (username && password) {
+          let role = '';
+          if (username.toLowerCase() === 'admin') {
+            role = 'Administrativo';
+          } else if (username.toLowerCase() === 'medico') {
+            role = 'Medico';
+          } else {
+            $('#login-error').removeClass('d-none');
+            return;
+          }
+          
+          // Set user info
+          $('#user-name').text(username);
+          $('#user-role').text(role);
+          
+          // Show/hide sections based on role
+          if (role === 'Medico') {
+            $('#nav-patients').hide();
+            $('#nav-appointments').hide();
+            $('#nav-services').hide();
+            $('#nav-dashboard').addClass('active');
+            showSection('dashboard');
+          } else {
+            $('#nav-patients').show();
+            $('#nav-appointments').show();
+            $('#nav-services').show();
+            $('#nav-patients').addClass('active');
+            showSection('patients');
+          }
+          
+          // Hide login, show app
+          $('#login-section').removeClass('active');
+          $('#app-section').addClass('active');
+        } else {
+          $('#login-error').removeClass('d-none');
+        }
+      });
+      
+      // Handle logout button
+      $('#logout-btn').on('click', function() {
+        $('#login-section').addClass('active');
+        $('#app-section').removeClass('active');
+        $('#username').val('');
+        $('#password').val('');
+        $('#login-error').addClass('d-none');
+        $('.sidebar-item').removeClass('active');
+      });
+      
+      // Handle sidebar navigation
+      $('.sidebar-item').on('click', function() {
+        const section = $(this).data('section');
+        $('.sidebar-item').removeClass('active');
+        $(this).addClass('active');
+        showSection(section);
+      });
+      
+      // Show consultation modal
+      $('#new-consultation-btn').on('click', function() {
+        const consultationModal = new bootstrap.Modal(document.getElementById('consultationModal'));
+        consultationModal.show();
+      });
+      
+      // Handle appointment calendar time slots
+      $('.time-slot.available').on('click', function() {
+        $('.time-slot').removeClass('selected');
+        $(this).addClass('selected');
+      });
+      
+      // Function to show a specific content section
+      function showSection(section) {
+        $('.content-section').removeClass('active');
+        $(`#${section}-section`).addClass('active');
+      }
+      
+      // --- JavaScript changes for Users Administration ---
+      // 1. Add in-memory users array and CRUD logic
+      // 2. Add renderUsers() to populate the users table
+      // 3. Add populateDoctorsDropdown() for doctor association
+      // 4. Add saveUser() for create/update logic with validation
+      // 5. Add deleteUser() for user removal
+      // 6. Add event handlers for:
+      //    - Sidebar navigation (showSection, renderUsers)
+      //    - New User button (open modal, reset form)
+      //    - Edit User button (open modal, populate form)
+      //    - Delete User button (confirmation and removal)
+      //    - Save User button (form submission)
+      //    - Role change in user form (toggle doctor association)
+      //    - Login form (role-based access control, show/hide nav items)
+      // 7. Keep all existing code and event handlers for other modules
+      
+      // In-memory users array
+      let users = [
+        { id: 1, name: 'Admin User', email: 'admin@example.com', role: 'Administrativo', doctorId: null },
+        { id: 2, name: 'Doctor User', email: 'doctor@example.com', role: 'Medico', doctorId: 1 }
+      ];
+      
+      // Function to render users table
+      function renderUsers() {
+        const usersTableBody = $('#users-table tbody');
+        usersTableBody.empty();
+        
+        users.forEach(user => {
+          const row = $('<tr>');
+          row.append(`<td>${user.id}</td>
+                     <td>${user.name}</td>
+                     <td>${user.email}</td>
+                     <td>${user.role}</td>
+                     <td>${user.doctorId ? 'Asociado' : 'No Asociado'}</td>
+                     <td>
+                       <button class="btn btn-sm btn-warning edit-user-btn" data-id="${user.id}">Editar</button>
+                       <button class="btn btn-sm btn-danger delete-user-btn" data-id="${user.id}">Eliminar</button>
+                     </td>`);
+          usersTableBody.append(row);
+        });
+      }
+      
+      // Populate doctors dropdown
+      function populateDoctorsDropdown() {
+        const doctorSelect = $('#doctor-select');
+        doctorSelect.empty();
+        
+        // Add "No Doctor" option
+        doctorSelect.append('<option value="">No Doctor</option>');
+        
+        // Add doctor options
+        users.forEach(user => {
+          if (user.role === 'Medico' && user.doctorId) {
+            doctorSelect.append(`<option value="${user.doctorId}">${user.name}</option>`);
+          }
+        });
+      }
+      
+      // Save user function with validation
+      function saveUser(userData) {
+        const { name, email, role, doctorId } = userData;
+        
+        // Validation
+        if (!name || !email || !role) {
+          alert('Todos los campos son obligatorios');
+          return;
+        }
+        
+        if (role === 'Medico' && !doctorId) {
+          alert('Un médico debe tener un doctor asociado');
+          return;
+        }
+        
+        // Check if user already exists
+        const existingUser = users.find(user => user.email === email);
+        if (existingUser) {
+          alert('Este correo ya está registrado');
+          return;
+        }
+        
+        // Create new user
+        const newUser = {
+          id: Date.now(),
+          name,
+          email,
+          role,
+          doctorId
+        };
+        
+        users.push(newUser);
+        renderUsers();
+        populateDoctorsDropdown();
+      }
+      
+      // Delete user function
+      function deleteUser(userId) {
+        if (confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
+          users = users.filter(user => user.id !== userId);
+          renderUsers();
+          populateDoctorsDropdown();
+        }
+      }
+      
+      // Event handlers for users administration
+      $('#new-user-btn').on('click', function() {
+        $('#user-modal').modal('show');
+        $('#user-form')[0].reset();
+        $('#user-role').val('Administrativo');
+        $('#doctor-select').val('');
+      });
+      
+      $('#edit-user-btn').on('click', function() {
+        const userId = $(this).data('id');
+        const user = users.find(u => u.id === userId);
+        
+        if (user) {
+          $('#user-modal').modal('show');
+          $('#user-form')[0].reset();
+          $('#user-role').val(user.role);
+          $('#doctor-select').val(user.doctorId || '');
+        }
+      });
+      
+      $('#delete-user-btn').on('click', function() {
+        const userId = $(this).data('id');
+        deleteUser(userId);
+      });
+      
+      $('#save-user-btn').on('click', function() {
+        const name = $('#user-name').val();
+        const email = $('#user-email').val();
+        const role = $('#user-role').val();
+        const doctorId = $('#doctor-select').val();
+        
+        saveUser({ name, email, role, doctorId });
+        
+        // Close modal
+        $('#user-modal').modal('hide');
+      });
+      
+      // Role change in user form
+      $('#user-role').on('change', function() {
+        const role = $(this).val();
+        const doctorSelect = $('#doctor-select');
+        
+        if (role === 'Medico') {
+          doctorSelect.prop('disabled', false);
+          doctorSelect.val('');
+        } else {
+          doctorSelect.prop('disabled', true);
+          doctorSelect.val('');
+        }
+      });
+      
+      // Handle login form submission with role-based access control
+      $('#login-form').on('submit', function(e) {
+        e.preventDefault();
+        const username = $('#username').val();
+        const password = $('#password').val();
+        
+        // Simulate login authentication
+        if (username && password) {
+          let role = '';
+          if (username.toLowerCase() === 'admin') {
+            role = 'Administrativo';
+          } else if (username.toLowerCase() === 'medico') {
+            role = 'Medico';
+          } else {
+            $('#login-error').removeClass('d-none');
+            return;
+          }
+          
+          // Set user info
+          $('#user-name').text(username);
+          $('#user-role').text(role);
+          
+          // Show/hide sections based on role
+          if (role === 'Medico') {
+            $('#nav-patients').hide();
+            $('#nav-appointments').hide();
+            $('#nav-services').hide();
+            $('#nav-dashboard').addClass('active');
+            showSection('dashboard');
+          } else {
+            $('#nav-patients').show();
+            $('#nav-appointments').show();
+            $('#nav-services').show();
+            $('#nav-patients').addClass('active');
+            showSection('patients');
+          }
+          
+          // Hide login, show app
+          $('#login-section').removeClass('active');
+          $('#app-section').addClass('active');
+        } else {
+          $('#login-error').removeClass('d-none');
+        }
+      });
+      
+      // Handle logout button
+      $('#logout-btn').on('click', function() {
+        $('#login-section').addClass('active');
+        $('#app-section').removeClass('active');
+        $('#username').val('');
+        $('#password').val('');
+        $('#login-error').addClass('d-none');
+        $('.sidebar-item').removeClass('active');
+      });
+      
+      // Handle sidebar navigation
+      $('.sidebar-item').on('click', function() {
+        const section = $(this).data('section');
+        $('.sidebar-item').removeClass('active');
+        $(this).addClass('active');
+        showSection(section);
+      });
+      
+      // Show consultation modal
+      $('#new-consultation-btn').on('click', function() {
+        const consultationModal = new bootstrap.Modal(document.getElementById('consultationModal'));
+        consultationModal.show();
+      });
+      
+      // Handle appointment calendar time slots
+      $('.time-slot.available').on('click', function() {
+        $('.time-slot').removeClass('selected');
+        $(this).addClass('selected');
+      });
+      
+      // Function to show a specific content section
+      function showSection(section) {
+        $('.content-section').removeClass('active');
+        $(`#${section}-section`).addClass('active');
+      }
+    });
+  </script>
+</body>
+</html>
