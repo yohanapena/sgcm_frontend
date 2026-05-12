@@ -138,7 +138,9 @@ const store = {
     },
   ],
   historial_citas: [],
+  signos_vitales: [],
   eps: EPS,
+
   regimenes: REGIMENES,
   especialidades: ESPECIALIDADES,
   servicios: SERVICIOS,
@@ -171,10 +173,30 @@ export async function apiRequest({ resource, method, params }) {
       return handleConsultas(method, params);
     case 'historial_citas':
       return handleHistorialCitas(method, params);
+    case 'historias_clinicas':
+      return handleHistoriasClinicas(method, params);
+    case 'signos_vitales':
+      return handleSignosVitales(method, params);
     default:
       return { data: [] };
   }
 }
+
+export async function getPacientes(params) {
+  return apiRequest({ resource: 'pacientes', method: 'GET', params });
+}
+
+export async function getCitas(params) {
+  return apiRequest({ resource: 'citas', method: 'GET', params });
+}
+
+export async function getMedicos(params) {
+  return apiRequest({ resource: 'medicos', method: 'GET', params });
+}
+
+// mantenemos la firma y el final de archivo sin llaves extra
+
+
 
 function handlePacientes(method, params) {
   if (method === 'GET') {
@@ -315,3 +337,68 @@ function handleHistorialCitas(method, params) {
 
   return { data: [] };
 }
+
+function handleHistoriasClinicas(method, params) {
+  if (method === 'GET') {
+    // Contrato flexible: si viene pacienteId, filtramos; si no, devolvemos todo.
+    if (params?.pacienteId) {
+      const data = store.historias_clinicas.filter((h) => h.id_paciente_fk === params.pacienteId);
+      return { data };
+    }
+    if (params?.id_paciente_fk) {
+      const data = store.historias_clinicas.filter((h) => h.id_paciente_fk === params.id_paciente_fk);
+      return { data };
+    }
+    return { data: store.historias_clinicas };
+  }
+
+  if (method === 'POST') {
+    const id = store.historias_clinicas.length
+      ? Math.max(...store.historias_clinicas.map((h) => h.id_historia_clinica)) + 1
+      : 1;
+
+    const nuevo = {
+      id_historia_clinica: id,
+      resumen: params?.resumen || '',
+      fecha_apertura: params?.fecha_apertura || new Date().toISOString().split('T')[0],
+      id_paciente_fk: params?.id_paciente_fk,
+    };
+
+    store.historias_clinicas.push(nuevo);
+    return { data: nuevo };
+  }
+
+  return { data: [] };
+}
+
+function handleSignosVitales(method, params) {
+  if (method === 'POST') {
+    const id = store.signos_vitales.length ? Math.max(...store.signos_vitales.map((s) => s.id_signos_vitales)) + 1 : 1;
+
+    const nuevo = {
+      id_signos_vitales: id,
+      id_consulta_fk: params?.id_consulta_fk,
+      peso: params?.peso ?? null,
+      estatura: params?.estatura ?? null,
+      temperatura: params?.temperatura ?? null,
+      presion_arterial: params?.presion_arterial ?? null,
+      frecuencia_cardiaca: params?.frecuencia_cardiaca ?? null,
+      saturacion_oxigeno: params?.saturacion_oxigeno ?? null,
+      fecha_registro: params?.fecha_registro || new Date().toISOString(),
+    };
+
+    store.signos_vitales.push(nuevo);
+    return { data: nuevo };
+  }
+
+  if (method === 'GET') {
+    // Útil futuro: filtrar por consulta
+    if (params?.id_consulta_fk) {
+      return { data: store.signos_vitales.filter((s) => s.id_consulta_fk === params.id_consulta_fk) };
+    }
+    return { data: store.signos_vitales };
+  }
+
+  return { data: [] };
+}
+

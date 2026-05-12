@@ -18,7 +18,14 @@ let filterInactiveBtn;
 let currentStatusFilter = null;
 
 export async function mountAdministradorModule() {
-  await registerUserAdministration();
+  console.log('🔄 Iniciando carga de módulo administrador del sistema...');
+  try {
+    await registerUserAdministration();
+    console.log('✅ Módulo administrador del sistema cargado correctamente');
+  } catch (error) {
+    console.error('❌ Error al cargar módulo administrador:', error);
+    throw error;
+  }
 }
 
 export async function renderUsers(statusFilter = null) {

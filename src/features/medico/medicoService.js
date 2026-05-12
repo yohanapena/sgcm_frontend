@@ -28,9 +28,10 @@ export async function getCitasHoy(medicoId) {
  * Obtiene la historia clínica de un paciente
  */
 export async function getHistoriaClinica(pacienteId) {
+  // Se mantiene como helper “completo” para pantallas/flujo existentes
   const result = await magicLoop({ resource: 'citas', method: 'GET' });
   const citas = result.data.filter((cita) => cita.id_paciente_fk === pacienteId);
-  
+
   // Obtener datos del paciente
   const pacientes = await magicLoop({ resource: 'pacientes', method: 'GET', params: { id_paciente: pacienteId } });
   const paciente = pacientes.data[0];
@@ -40,8 +41,12 @@ export async function getHistoriaClinica(pacienteId) {
   const historia = historiasResult.data.find((h) => h.id_paciente_fk === pacienteId);
 
   // Obtener consultas previas
-  const consultasResult = await magicLoop({ resource: 'consultas', method: 'GET', params: { id_historia_clinica_fk: historia?.id_historia_clinica } });
-  
+  const consultasResult = await magicLoop({
+    resource: 'consultas',
+    method: 'GET',
+    params: { id_historia_clinica_fk: historia?.id_historia_clinica },
+  });
+
   return {
     paciente,
     historia,
@@ -49,6 +54,46 @@ export async function getHistoriaClinica(pacienteId) {
     consultasAntes: consultasResult.data || [],
   };
 }
+
+/**
+ * Obtiene solo la historia clínica (o null) para un paciente.
+ * Útil para el flujo del módulo médico.
+ */
+export async function getHistoriaClinicaByPaciente(pacienteId) {
+  const historiasResult = await magicLoop({ resource: 'historias_clinicas', method: 'GET', params: { pacienteId } });
+
+  // Compatibilidad con mock/contrato futuro: si el mock devuelve todo, filtramos aquí.
+  const historias = historiasResult?.data || [];
+  return historias.find((h) => h.id_paciente_fk === pacienteId) || null;
+}
+
+/**
+ * Crea historia clínica (append, no sobrescribe).
+ */
+export async function createHistoriaClinica({ id_paciente_fk, resumen = '' }) {
+  const resultado = await magicLoop({
+    resource: 'historias_clinicas',
+    method: 'POST',
+    params: { id_paciente_fk, resumen, fecha_apertura: new Date().toISOString().split('T')[0] },
+  });
+
+  return resultado.data;
+}
+
+/**
+ * Registra signos vitales asociados a una consulta.
+ * Se modela como recurso independiente para asegurar “append por consulta”.
+ */
+export async function registrarSignosVitalesPorConsulta({ id_consulta_fk, ...signos }) {
+  const resultado = await magicLoop({
+    resource: 'signos_vitales',
+    method: 'POST',
+    params: { id_consulta_fk, ...signos, fecha_registro: new Date().toISOString() },
+  });
+
+  return resultado.data;
+}
+
 
 /**
  * Obtiene detalles de un paciente específico

@@ -3,7 +3,12 @@ import {
   getTodasCitasMedico,
   registrarConsultaConServicios,
   getServicios,
+  getHistoriaClinicaByPaciente,
+  createHistoriaClinica,
+  registrarSignosVitalesPorConsulta,
 } from './medicoService.js';
+
+
 
 let medicoActual = null;
 let serviciosDisponibles = [];
@@ -191,23 +196,162 @@ function abrirRegistroConsultaModal(cita) {
 
   if (citaHiddenInput) citaHiddenInput.value = cita.id_cita;
 
+  // Vaciar inputs principales
   if (diagnosticoInput) diagnosticoInput.value = '';
   if (observacionInput) observacionInput.value = '';
 
-  // Populate services checkboxes
+  // Reset signos vitales (solo del formulario)
+  const signosVitalesContainer = document.getElementById('registro-signos-vitales-container');
+  if (signosVitalesContainer) {
+    signosVitalesContainer.querySelectorAll('input, select, textarea').forEach((el) => {
+      if (el.tagName === 'SELECT') {
+        el.selectedIndex = 0;
+      } else {
+        el.value = '';
+      }
+    });
+  }
+
+  // === Cargar historia y completar UI (encabezado, alertas, antecedentes, resumen, previas) ===
+  try {
+    const pacienteId = cita.id_paciente_fk;
+    const datosHistoria = pacienteId ? await getHistoriaClinicaByPaciente(pacienteId) : null;
+
+    // Encabezado paciente
+    const nombreEncabezado = document.getElementById('registro-encabezado-nombre');
+    const edadEncabezado = document.getElementById('registro-encabezado-edad');
+    const documentoEncabezado = document.getElementById('registro-encabezado-documento');
+    const sangreEncabezado = document.getElementById('registro-encabezado-sangre');
+
+    // En mock no siempre llega paciente dentro de getHistoriaClinicaByPaciente; lo dejamos como fallback
+    if (nombreEncabezado) nombreEncabezado.textContent = `Paciente ${pacienteId ?? '-'}`;
+    if (documentoEncabezado) documentoEncabezado.textContent = '—';
+    if (edadEncabezado) edadEncabezado.textContent = '—';
+
+    // Tipo de sangre (mock demo)
+    if (sangreEncabezado) {
+      const tipos = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+      sangreEncabezado.textContent = tipos[Math.floor(Math.random() * tipos.length)];
+    }
+
+    // Alertas (mock de ejemplo hasta backend)
+    const alergiasContainer = document.getElementById('registro-alergias-container');
+    const alergiasDiv = document.getElementById('registro-alergias');
+    if (alergiasContainer && alergiasDiv) {
+      const alergiasDemo = ['Penicilina', 'Ibuprofeno'];
+      const alergias = alergiasDemo;
+
+      if (alergias?.length) {
+        alergiasDiv.innerHTML = alergias
+          .map(
+            (alergia) => `
+            <div class="alert alert-warning alert-sm py-2 px-3 mb-0" style="display: inline-block; border-radius: 20px; font-size: 0.85rem;">
+              <i class="fas fa-exclamation-triangle"></i> <strong>Alergia:</strong> ${alergia}
+            </div>
+          `
+          )
+          .join('');
+        alergiasContainer.style.display = 'block';
+      } else {
+        alergiasContainer.style.display = 'none';
+      }
+    }
+
+    // Antecedentes (mock/placeholder)
+    const antecedentesEl = document.getElementById('registro-antecedentes');
+    if (antecedentesEl) {
+      antecedentesEl.innerHTML =
+        (datosHistoria?.antecedentes && String(datosHistoria.antecedentes).trim())
+          ? datosHistoria.antecedentes
+          : 'Hipertensión controlada | Diabetes tipo 2 | Sin antecedentes quirúrgicos';
+    }
+
+    // Resumen clínico
+    const resumenEl = document.getElementById('registro-historia-resumen');
+    if (resumenEl) {
+      resumenEl.textContent = datosHistoria?.resumen || 'Sin información clínica disponible en el registro.';
+    }
+
+    // Historial de consultas previas (si existe el endpoint en mock)
+    const consultasPreviasEl = document.getElementById('registro-consultas-previas');
+    if (consultasPreviasEl) {
+      const historiaId = datosHistoria?.id_historia_clinica || null;
+      if (!historiaId) {
+        consultasPreviasEl.innerHTML = `
+          <div class="text-muted small p-2 text-center">
+            Sin consultas previas
+          </div>
+        `;
+      } else {
+        // Obtener consultas previas desde mock/contrato (sin importar magicLoop directo)
+        const consultasAntesResp = datosHistoria?.consultasAntes;
+        const consultasAntes = Array.isArray(consultasAntesResp) ? consultasAntesResp : [];
+
+
+        if (consultasAntes.length === 0) {
+          consultasPreviasEl.innerHTML = `
+            <div class="text-muted small p-2 text-center">
+              Sin consultas previas
+            </div>
+          `;
+        } else {
+          consultasPreviasEl.innerHTML = consultasAntes
+            .map(
+              (consulta, idx) => `
+              <div class="card card-sm mb-2" style="border-left: 4px solid #0dcaf0;">
+                <div class="card-body p-2">
+                  <div class="d-flex justify-content-between align-items-start mb-1">
+                    <small class="fw-600 text-dark">${consulta.fecha_consulta || consulta.fecha || 'Fecha no disponible'}</small>
+                    <span class="badge bg-secondary" style="font-size: 0.7rem;">Consulta ${idx + 1}</span>
+                  </div>
+                  <div class="small fw-600 text-primary mb-1">Diagnóstico:</div>
+                  <div class="small text-dark mb-2">${consulta.diagnostico || 'Sin diagnóstico registrado'}</div>
+                  ${consulta.observacion ? `<div class="small text-muted"><strong>Nota:</strong> ${consulta.observacion}</div>` : ''}
+                </div>
+              </div>
+            `
+            )
+            .join('');
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('No se pudo cargar historia clínica para UI:', e);
+  }
+
+  // Populate services checkboxes (con grid correcto: registro-servicios-grid)
   if (serviciosContainer) {
-    serviciosContainer.innerHTML = serviciosDisponibles
-      .map(
-        (servicio) => `
-        <div class="form-check">
-          <input class="form-check-input servicio-check" type="checkbox" id="servicio-${servicio.id_servicio}" value="${servicio.id_servicio}">
-          <label class="form-check-label" for="servicio-${servicio.id_servicio}">
-            ${servicio.nombre}
-          </label>
-        </div>
-      `
-      )
-      .join('');
+    const grid = document.getElementById('registro-servicios-grid');
+    if (grid) {
+      grid.innerHTML = serviciosDisponibles
+        .map(
+          (servicio) => `
+            <div class="col">
+              <div class="form-check">
+                <input class="form-check-input servicio-check" type="checkbox" id="servicio-${servicio.id_servicio}" value="${servicio.id_servicio}">
+                <label class="form-check-label" for="servicio-${servicio.id_servicio}">
+                  <i class="fas fa-check-circle text-success" style="opacity: 0.3;"></i> ${servicio.nombre}
+                </label>
+              </div>
+            </div>
+          `
+        )
+        .join('');
+    } else {
+      // fallback antiguo si cambia el HTML
+      serviciosContainer.innerHTML = serviciosDisponibles
+        .map(
+          (servicio) => `
+          <div class="form-check">
+            <input class="form-check-input servicio-check" type="checkbox" id="servicio-${servicio.id_servicio}" value="${servicio.id_servicio}">
+            <label class="form-check-label" for="servicio-${servicio.id_servicio}">
+              ${servicio.nombre}
+            </label>
+          </div>
+        `
+        )
+        .join('');
+    }
   }
 
   registroConsultaModal.show();
@@ -238,16 +382,68 @@ async function handleRegistrarConsulta(event) {
   }
 
   try {
-    await registrarConsultaConServicios({
+    const payloadConsulta = {
       id_cita_fk: currentCitaForConsulta.id_cita,
+      id_historia_clinica_fk: currentCitaForConsulta.id_historia_clinica_fk || null,
       diagnostico,
       observacion,
       servicios_ids: serviciosSeleccionados,
+    };
+
+    // === Flujo historia clínica (si no existe, crear) ===
+    // Contrato backend: POST historias_clinicas -> {id_historia_clinica}
+    if (!payloadConsulta.id_historia_clinica_fk) {
+      const pacienteId = currentCitaForConsulta.id_paciente_fk;
+      if (!pacienteId) throw new Error('No se encontró id_paciente_fk en la cita');
+
+      let historia = await getHistoriaClinicaByPaciente(pacienteId);
+      if (!historia) {
+        historia = await createHistoriaClinica({
+          id_paciente_fk: pacienteId,
+          resumen: 'Historia clínica creada automáticamente desde módulo médico (mock)',
+        });
+      }
+
+      payloadConsulta.id_historia_clinica_fk = historia?.id_historia_clinica || historia?.id_historia_clinica_fk || null;
+    }
+
+    // Guardar consulta
+    const consultaGuardada = await registrarConsultaConServicios(payloadConsulta);
+
+    const signos = {
+      peso: document.getElementById('signos-peso')?.value
+        ? Number(document.getElementById('signos-peso').value)
+        : null,
+
+      estatura: document.getElementById('signos-estatura')?.value
+        ? Number(document.getElementById('signos-estatura').value)
+        : null,
+
+      temperatura: document.getElementById('signos-temperatura')?.value ? Number(document.getElementById('signos-temperatura').value) : null,
+      presion_arterial: document.getElementById('signos-presion')?.value?.trim() || null,
+      frecuencia_cardiaca: document.getElementById('signos-frecuencia-cardiaca')?.value ? Number(document.getElementById('signos-frecuencia-cardiaca').value) : null,
+      saturacion_oxigeno: document.getElementById('signos-saturacion')?.value ? Number(document.getElementById('signos-saturacion').value) : null,
+    };
+
+    // Persistir signos vitales (append por consulta)
+    // Contrato backend futuro: POST /signos_vitales { id_consulta_fk, ...signos }
+    const idConsultaParaSignos = consultaGuardada?.id_consulta || consultaGuardada?.id_consulta_fk || null;
+    if (!idConsultaParaSignos) {
+      throw new Error('No se pudo obtener id_consulta para asociar signos vitales');
+    }
+
+    await registrarSignosVitalesPorConsulta({
+      id_consulta_fk: idConsultaParaSignos,
+      ...signos,
     });
 
+    console.log('🩺 Signos vitales guardados (mock):', signos);
+
     alert('✅ Consulta registrada exitosamente');
+
     registroConsultaModal.hide();
     registroConsultaForm?.reset();
+
 
     // Refresh citas
     citasHoy = await getCitasHoy(medicoActual);
@@ -285,7 +481,7 @@ function createRegistroConsultaModal() {
   modalDiv.id = 'registro-consulta-modal';
   modalDiv.tabIndex = '-1';
   modalDiv.innerHTML = `
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Registrar Consulta</h5>
@@ -294,31 +490,128 @@ function createRegistroConsultaModal() {
         <div class="modal-body">
           <form id="registro-consulta-form">
             <input type="hidden" id="registro-cita-id" value="">
-            
-            <div class="mb-3">
-              <label for="registro-diagnostico" class="form-label">Diagnóstico *</label>
-              <textarea class="form-control" id="registro-diagnostico" rows="4" required></textarea>
+
+            <div class="mb-4">
+              <div class="row gy-3 align-items-center">
+                <div class="col-lg-8">
+                  <div class="card border-0 shadow-sm bg-primary text-white p-3">
+                    <div class="d-flex align-items-center gap-3">
+                      <div class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center" style="width:56px;height:56px;">
+                        <i class="fas fa-user-md fa-lg"></i>
+                      </div>
+                      <div>
+                        <div id="registro-encabezado-nombre" class="h5 mb-1">Paciente</div>
+                        <div class="small" id="registro-encabezado-detalle">Edad • Documento • Tipo de sangre</div>
+                      </div>
+                    </div>
+                    <div id="registro-alergias-container" class="mt-3" style="display:none;">
+                      <div id="registro-alergias" class="d-flex flex-wrap gap-2"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div class="mb-3">
-              <label for="registro-observacion" class="form-label">Observaciones</label>
-              <textarea class="form-control" id="registro-observacion" rows="2"></textarea>
+            <div class="row gy-4">
+              <div class="col-lg-4">
+                <div class="card mb-3 shadow-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">Antecedentes</h6>
+                    <div id="registro-antecedentes" class="small text-muted">Cargando antecedentes...</div>
+                  </div>
+                </div>
+
+                <div class="card mb-3 shadow-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">Resumen clínico</h6>
+                    <div id="registro-historia-resumen" class="small text-muted">Cargando resumen clínico...</div>
+                  </div>
+                </div>
+
+                <div class="card shadow-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">Historial de consultas</h6>
+                    <div id="registro-consultas-previas" class="small text-muted">Cargando historial...</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-lg-5">
+                <div class="mb-3">
+                  <label for="registro-diagnostico" class="form-label">Diagnóstico *</label>
+                  <textarea class="form-control" id="registro-diagnostico" rows="5" required></textarea>
+                  <small class="text-muted">Sé específico y conciso. Este es el campo principal del registro.</small>
+                </div>
+
+                <div class="mb-4">
+                  <label for="registro-observacion" class="form-label">Observaciones y recomendaciones</label>
+                  <textarea class="form-control" id="registro-observacion" rows="4"></textarea>
+                  <small class="text-muted">Notas clínicas, recomendaciones al paciente, tratamiento, follow-up...</small>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label fw-600">Servicios prestados *</label>
+                  <div id="registro-servicios-container">
+                    <div id="registro-servicios-grid" class="row row-cols-1 row-cols-md-2 g-2"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-lg-3">
+                <div class="card shadow-sm">
+                  <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                      <div>
+                        <h6 class="card-title">Signos vitales</h6>
+                        <small class="text-muted">Registra datos por consulta</small>
+                      </div>
+                      <i class="fas fa-heartbeat text-danger"></i>
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label small mb-1">Presión arterial</label>
+                      <input type="text" class="form-control" id="signos-presion" placeholder="Ej: 120/80">
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label small mb-1">Frecuencia cardíaca (lpm)</label>
+                      <input type="number" step="1" class="form-control" id="signos-frecuencia-cardiaca" placeholder="Ej: 72">
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label small mb-1">Temperatura (°C)</label>
+                      <input type="number" step="0.1" class="form-control" id="signos-temperatura" placeholder="Ej: 36.5">
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label small mb-1">Saturación de O<sub>2</sub> (%)</label>
+                      <input type="number" step="0.1" class="form-control" id="signos-saturacion" placeholder="Ej: 98">
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label small mb-1">Peso (kg)</label>
+                      <input type="number" step="0.1" class="form-control" id="signos-peso" placeholder="Ej: 70">
+                    </div>
+
+                    <div>
+                      <label class="form-label small mb-1">Talla (cm)</label>
+                      <input type="number" step="0.1" class="form-control" id="signos-estatura" placeholder="Ej: 165">
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div class="mb-3">
-              <label class="form-label">Servicios Prestados *</label>
-              <div id="registro-servicios-container"></div>
-            </div>
-
-            <div class="d-flex gap-2">
+            <div class="mt-4 d-flex gap-2 justify-content-end">
               <button type="submit" class="btn btn-primary">Guardar Consulta</button>
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
             </div>
           </form>
         </div>
       </div>
     </div>
   `;
+
   
   document.body.appendChild(modalDiv);
   return modalDiv;
