@@ -11,39 +11,48 @@ let filtroPacienteInput;
 let aplicarFiltrosBtn;
 let limpiarFiltrosBtn;
 let alertTimeoutId = null;
+let cancelCitaId = null;
+let atenderCitaId = null;
+
+const ESTADOS_FALLBACK = [
+  { id: 1, nombre: 'Pendiente' },
+  { id: 2, nombre: 'Atendida' },
+  { id: 3, nombre: 'Cancelada' },
+  { id: 4, nombre: 'No asistió' },
+];
 
 const api = {
   getCitasFiltradas: async (filtros) => {
     const response = await getCitasFiltradas(filtros);
-    return response?.data || response || [];
+    return response || [];
   },
   getCita: async (id) => {
     const response = await getCita(id);
-    return response?.data || response || null;
+    return response || null;
   },
   actualizarCita: async (id, data) => {
     const response = await updateCita(id, data);
-    return response?.data || response;
+    return response;
   },
   cancelarCita: async (id, motivo) => {
     const response = await cancelarCita(id, motivo);
-    return response?.data || response;
+    return response;
   },
   registrarHistorial: async (id, datos) => {
     const response = await registrarHistorialCita(id, datos);
-    return response?.data || response;
+    return response;
   },
   getMedicos: async () => {
     const response = await getMedicos();
-    return response?.data || response || [];
+    return response || [];
   },
   getEspecialidades: async () => {
     const response = await getEspecialidades();
-    return response?.data || response || [];
+    return response || [];
   },
   getEstados: async () => {
     const response = await getEstados();
-    return response?.data || response || [];
+    return response || [];
   }
 };
 
@@ -115,13 +124,29 @@ async function populateFilterOptions() {
   if (filtroEstadoSelect) {
     try {
       const estados = await api.getEstados();
-      if (Array.isArray(estados) && estados.length > 0) {
-        filtroEstadoSelect.innerHTML = `<option value="">Todos los estados</option>` +
-          estados.map((estado) => `<option value="${estado}">${capitalizarPrimera(estado)}</option>`).join('');
-      }
+      renderEstadoOptions(estados);
     } catch (error) {
       console.warn('Error loading estados:', error.message);
+      renderEstadoOptions(ESTADOS_FALLBACK, true);
+      mostrarAlerta('warning', 'No se pudo cargar el catálogo de estados, se usan valores por defecto.');
     }
+  }
+}
+
+function renderEstadoOptions(estados, isFallback = false) {
+  if (!filtroEstadoSelect) return;
+
+  const listaEstados = Array.isArray(estados) ? estados : [];
+  const opciones = listaEstados.length > 0 ? listaEstados.map((estado) => {
+    const value = typeof estado === 'string' ? estado : estado?.nombre || '';
+    const label = typeof estado === 'string' ? capitalizarPrimera(estado) : estado?.nombre || '';
+    return value ? `<option value="${value}">${label}</option>` : '';
+  }).join('') : '';
+
+  filtroEstadoSelect.innerHTML = `<option value="">Todos los estados</option>` + (opciones || ESTADOS_FALLBACK.map((estado) => `<option value="${estado.nombre}">${estado.nombre}</option>`).join(''));
+
+  if (!listaEstados.length && !isFallback) {
+    mostrarAlerta('warning', 'Catálogo de estados vacío. Se muestran opciones predeterminadas.');
   }
 }
 
@@ -191,17 +216,12 @@ function renderAgendaTable(citas) {
         <td>${cita.observaciones || '-'}</td>
         <td>
           <div class="btn-group btn-group-sm" role="group">
-            ${cita.estado !== 'cancelada' ? `
+            ${cita.estado !== 'Cancelada' ? `
               <button type="button" class="btn btn-outline-warning" onclick="modificarCita(${cita.id_cita})" title="Modificar">
                 <i class="fas fa-edit"></i>
               </button>
               <button type="button" class="btn btn-outline-danger" onclick="cancelarCitaModal(${cita.id_cita})" title="Cancelar">
                 <i class="fas fa-times"></i>
-              </button>
-            ` : ''}
-            ${cita.estado === 'confirmada' ? `
-              <button type="button" class="btn btn-outline-success" onclick="registrarCitaCompletada(${cita.id_cita})" title="Marcar completada">
-                <i class="fas fa-check"></i>
               </button>
             ` : ''}
             <button type="button" class="btn btn-outline-info" onclick="verDetallesCita(${cita.id_cita})" title="Ver detalles">
@@ -216,10 +236,9 @@ function renderAgendaTable(citas) {
 
 function getEstadoBadgeColor(estado) {
   const colors = {
-    confirmada: 'success',
-    pendiente: 'warning',
-    cancelada: 'danger',
-    completada: 'info'
+    Agendada: 'warning',
+    Atendida: 'success',
+    Cancelada: 'danger',
   };
   return colors[estado] || 'secondary';
 }
@@ -247,8 +266,31 @@ function abrirModalModificarCita(cita) {
     return;
   }
 
-  // Populate modal with cita data
+  // Reset modal state before populating
   const modalContent = modal.querySelector('.modal-body');
+  if (modalContent) {
+    modalContent.innerHTML = ''; // Clear previous content
+  }
+
+  // Reset any forms within the modal
+  const forms = modal.querySelectorAll('form');
+  forms.forEach(form => form.reset());
+
+  // Clear any previous error messages
+  const errorElements = modal.querySelectorAll('.alert, .text-danger, .invalid-feedback');
+  errorElements.forEach(el => el.remove());
+
+  // Reset select elements to default
+  const selects = modal.querySelectorAll('select');
+  selects.forEach(select => {
+    select.selectedIndex = 0;
+  });
+
+  // Clear any global modal state variables if they exist
+  if (typeof cancelCitaId !== 'undefined') cancelCitaId = null;
+  if (typeof atenderCitaId !== 'undefined') atenderCitaId = null;
+
+  // Populate modal with cita data
   if (modalContent) {
     modalContent.innerHTML = `
       <div class="mb-3">
@@ -328,36 +370,95 @@ async function guardarCambiosCita(citaId) {
 }
 
 async function cancelarCitaModal(citaId) {
-  // Open modal to confirm cancellation
-  const motivo = prompt('¿Cuál es el motivo de la cancelación?', '');
-  if (!motivo || motivo.trim() === '') {
+  const modal = document.getElementById('modal-cancelar-cita');
+  if (!modal) {
+    mostrarAlerta('warning', 'Modal de cancelación no disponible.');
     return;
   }
 
-  try {
-    await api.cancelarCita(citaId, motivo.trim());
-    mostrarAlerta('success', 'Cita cancelada exitosamente.');
-    await cargarAgenda();
-  } catch (error) {
-    mostrarAlerta('danger', 'Error al cancelar cita: ' + error.message);
+  cancelCitaId = citaId;
+  const motivoInput = modal.querySelector('#cancel-cita-motivo');
+  const motivoError = modal.querySelector('#cancel-cita-error');
+  if (motivoInput) motivoInput.value = '';
+  if (motivoError) motivoError.textContent = '';
+
+  const confirmButton = modal.querySelector('#confirm-cancel-cita-btn');
+  if (confirmButton) {
+    confirmButton.onclick = async () => {
+      const motivo = motivoInput?.value?.trim() || '';
+      if (!motivo) {
+        if (motivoError) motivoError.textContent = 'El motivo es obligatorio.';
+        return;
+      }
+
+      try {
+        await api.cancelarCita(cancelCitaId, motivo);
+        mostrarAlerta('success', 'Cita cancelada exitosamente.');
+        await cargarAgenda();
+        const bsModal = new (window.bootstrap?.Modal || function(){})(modal);
+        if (bsModal.hide) bsModal.hide();
+      } catch (error) {
+        mostrarAlerta('danger', 'Error al cancelar cita: ' + error.message);
+      }
+    };
   }
+
+  const bsModal = new (window.bootstrap?.Modal || function(){})(modal);
+  if (bsModal.show) bsModal.show();
 }
 
 async function registrarCitaCompletada(citaId) {
-  try {
-    const nota = prompt('Ingrese nota o observación de la consulta:', '');
-
-    const datosHistorial = {
-      estado: 'completada',
-      nota_clinica: nota || ''
-    };
-
-    await api.registrarHistorial(citaId, datosHistorial);
-    mostrarAlerta('success', 'Cita marcada como completada.');
-    await cargarAgenda();
-  } catch (error) {
-    mostrarAlerta('danger', 'Error al completar cita: ' + error.message);
+  const modal = document.getElementById('modal-atender-cita');
+  if (!modal) {
+    mostrarAlerta('warning', 'Modal de atención no disponible.');
+    return;
   }
+
+  atenderCitaId = citaId;
+  const notaInput = modal.querySelector('#atender-cita-nota');
+  const notaError = modal.querySelector('#atender-cita-error');
+  if (notaInput) notaInput.value = '';
+  if (notaError) notaError.textContent = '';
+
+  const confirmButton = modal.querySelector('#confirm-atender-cita-btn');
+  if (confirmButton) {
+    confirmButton.onclick = async () => {
+      const nota = notaInput?.value?.trim() || '';
+      if (!nota) {
+        if (notaError) notaError.textContent = 'La observación es obligatoria.';
+        return;
+      }
+
+      try {
+        const servicioCheckboxes = Array.from(modal.querySelectorAll('.servicio-check:checked'));
+        const serviciosSeleccionados = servicioCheckboxes
+          .map((checkbox) => Number(checkbox.value))
+          .filter((id) => Number.isInteger(id) && id > 0);
+
+        if (serviciosSeleccionados.length === 0) {
+          if (notaError) notaError.textContent = 'Debes seleccionar al menos un servicio.';
+          return;
+        }
+
+        const datosHistorial = {
+          diagnostico: nota,
+          observacion: nota,
+          servicios_ids: serviciosSeleccionados,
+        };
+
+        await api.registrarHistorial(atenderCitaId, datosHistorial);
+        mostrarAlerta('success', 'Cita marcada como atendida.');
+        await cargarAgenda();
+        const bsModal = new (window.bootstrap?.Modal || function(){})(modal);
+        if (bsModal.hide) bsModal.hide();
+      } catch (error) {
+        mostrarAlerta('danger', 'Error al marcar cita como atendida: ' + error.message);
+      }
+    };
+  }
+
+  const bsModal = new (window.bootstrap?.Modal || function(){})(modal);
+  if (bsModal.show) bsModal.show();
 }
 
 function verDetallesCita(citaId) {

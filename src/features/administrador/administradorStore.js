@@ -1,36 +1,12 @@
-export const localUsers = [
-  {
-    id_usuario: 1,
-    usuario: 'admin1',
-    contrasena: 'password123',
-    rol: 'Administrativo',
-    nombre: 'María Pérez',
-    status: 'Activo',
-    created_at: '2026-01-01 10:00:00',
-    updated_at: '2026-01-01 10:00:00',
-  },
-  {
-    id_usuario: 2,
-    usuario: 'admin2',
-    contrasena: 'password123',
-    rol: 'Administrador',
-    nombre: 'Andrés Gómez',
-    status: 'Activo',
-    created_at: '2026-01-02 11:00:00',
-    updated_at: '2026-01-02 11:00:00',
-  },
-  {
-    id_usuario: 3,
-    usuario: 'medico1',
-    contrasena: 'password123',
-    rol: 'Médico',
-    nombre: 'Dr. Juan Díaz',
-    id_medico_fk: 2,
-    status: 'Activo',
-    created_at: '2026-01-03 12:00:00',
-    updated_at: '2026-01-03 12:00:00',
-  },
-];
+const isDevMode = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'development';
+
+export let localUsers = [];
+
+if (isDevMode) {
+  // TODO: remover en producción
+  const { MOCK_USERS } = await import('../../mocks/mockUsers.js');
+  localUsers = Array.isArray(MOCK_USERS) ? MOCK_USERS : [];
+}
 
 export function getLocalUsers() {
   return localUsers;

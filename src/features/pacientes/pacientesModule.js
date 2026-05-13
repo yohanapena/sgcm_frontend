@@ -206,13 +206,16 @@ function renderPatientResults(patients) {
   }
 
   patientResultsTable.innerHTML = patients
-    .map((patient) => `
+    .map((patient) => {
+      const epsValue = patient.id_eps_fk ?? patient.eps ?? null;
+      const regimenValue = patient.id_regimen_fk ?? patient.regimen ?? null;
+      return `
       <tr>
-        <td>${patient.num_identificacion}</td>
+        <td>${patient.numero_identificacion ?? patient.num_identificacion ?? '—'}</td>
         <td>${patient.nombre}</td>
         <td>${patient.primer_apellido} ${patient.segundo_apellido || ''}</td>
-        <td>${patient.id_eps_fk || patient.eps || 'N/A'}</td>
-        <td>${patient.id_regimen_fk || patient.regimen || 'N/A'}</td>
+        <td>${epsValue ?? 'N/A'}</td>
+        <td>${regimenValue ?? 'N/A'}</td>
         <td>
           <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editarPaciente(${patient.id_paciente})">
             <i class="bi bi-pencil-fill"></i> Editar
@@ -222,7 +225,8 @@ function renderPatientResults(patients) {
           </button>
         </td>
       </tr>
-    `)
+    `;
+    })
     .join('');
 }
 
@@ -241,6 +245,9 @@ async function editarPaciente(patientId) {
     cancelEditButton.classList.remove('d-none');
     pacienteIdInput.disabled = true;
 
+    const epsValue = patient.id_eps_fk ?? patient.eps ?? null;
+    const regimenValue = patient.id_regimen_fk ?? patient.regimen ?? null;
+
     pacienteIdInput.value = patient.numero_identificacion || '';
     birthDateInput.value = patient.fecha_nacimiento || '';
     firstNameInput.value = patient.nombre || '';
@@ -249,8 +256,8 @@ async function editarPaciente(patientId) {
     addressInput.value = patient.direccion || '';
     sexoSelect.value = patient.sexo || '';
     tipoSangreSelect.value = patient.tipo_sangre || '';
-    epsSelect.value = patient.id_eps_fk ? String(patient.id_eps_fk) : '';
-    regimenSelect.value = patient.id_regimen_fk ? String(patient.id_regimen_fk) : '';
+    epsSelect.value = epsValue ? String(epsValue) : '';
+    regimenSelect.value = regimenValue ? String(regimenValue) : '';
 
     clearContacts();
     if (Array.isArray(patient.contactos) && patient.contactos.length > 0) {

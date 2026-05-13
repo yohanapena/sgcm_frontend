@@ -19,9 +19,13 @@ const store = {
       direccion: 'Calle 123 #45-67',
       id_eps_fk: 1,
       id_regimen_fk: 1,
+      sexo: 'F',
+      tipo_sangre: 'O+',
+      alergias: ['Ninguna'],
+      antecedentes: 'Hipertensión arterial leve. Sin cirugías previas.',
       contactos: [
-        { tipo: 'celular', valor: '321-456-7890' },
-        { tipo: 'email', valor: 'maria@example.com' },
+        { tipo: 'celular', dato_contacto: '321-456-7890' },
+        { tipo: 'email', dato_contacto: 'maria@example.com' },
       ],
     },
     {
@@ -34,9 +38,13 @@ const store = {
       direccion: 'Calle 456 #89-10',
       id_eps_fk: 2,
       id_regimen_fk: 1,
+      sexo: 'M',
+      tipo_sangre: 'A+',
+      alergias: ['Penicilina'],
+      antecedentes: 'Diabetes tipo 2 controlada con dieta y medicación.',
       contactos: [
-        { tipo: 'celular', valor: '310-123-4567' },
-        { tipo: 'email', valor: 'juan@example.com' },
+        { tipo: 'celular', dato_contacto: '310-123-4567' },
+        { tipo: 'email', dato_contacto: 'juan@example.com' },
       ],
     },
     {
@@ -49,9 +57,13 @@ const store = {
       direccion: 'Calle 789 #12-34',
       id_eps_fk: 1,
       id_regimen_fk: 2,
+      sexo: 'F',
+      tipo_sangre: 'B+',
+      alergias: [],
+      antecedentes: 'Paciente sin antecedentes médicos relevantes.',
       contactos: [
-        { tipo: 'celular', valor: '300-555-1234' },
-        { tipo: 'email', valor: 'ana@example.com' },
+        { tipo: 'celular', dato_contacto: '300-555-1234' },
+        { tipo: 'email', dato_contacto: 'ana@example.com' },
       ],
     },
   ],
@@ -145,14 +157,26 @@ const store = {
   especialidades: ESPECIALIDADES,
   servicios: SERVICIOS,
   horarios: HORARIOS,
+  estados: [
+    { id: 1, nombre: 'Pendiente' },
+    { id: 2, nombre: 'Atendida' },
+    { id: 3, nombre: 'Cancelada' },
+    { id: 4, nombre: 'No asistió' },
+  ],
 };
 
 export function initializeMockApi() {
   console.log('Mock API inicializada');
 }
 
-export async function apiRequest({ resource, method, params }) {
-  switch (resource) {
+export async function apiRequest({ resource, method = 'GET', params } = {}) {
+  const normalizedResource = typeof resource === 'string' ? resource.replace(/^\/+/, '') : '';
+  const [root, secondSegment, thirdSegment] = normalizedResource.split('/');
+  const resourceId = secondSegment && !Number.isNaN(Number(secondSegment)) ? Number(secondSegment) : null;
+
+  switch (root) {
+    case 'auth':
+      return handleAuth(method, secondSegment, params);
     case 'eps':
       return { data: store.eps };
     case 'regimenes':
@@ -162,13 +186,19 @@ export async function apiRequest({ resource, method, params }) {
     case 'servicios':
       return { data: store.servicios };
     case 'medicos':
-      return handleMedicos(method, params);
+      return handleMedicos(method, params, resourceId);
     case 'horarios':
+      if (params?.medico_id) {
+        const medicoId = Number(params.medico_id);
+        return { data: store.horarios.filter(h => h.id_medico_fk === medicoId) };
+      }
       return { data: store.horarios };
+    case 'estados':
+      return { data: store.estados };
     case 'pacientes':
-      return handlePacientes(method, params);
+      return handlePacientes(method, params, resourceId);
     case 'citas':
-      return handleCitas(method, params);
+      return handleCitas(method, params, resourceId, thirdSegment);
     case 'consultas':
       return handleConsultas(method, params);
     case 'historial_citas':
@@ -196,13 +226,70 @@ export async function getMedicos(params) {
 
 // mantenemos la firma y el final de archivo sin llaves extra
 
+function handleAuth(method, action, params) {
+  if (method === 'POST' && action === 'login') {
+    const username = params?.usuario?.toString();
+    const password = params?.contrasena?.toString();
 
+    // Credenciales de desarrollo
+    if ((username === 'admin' && password === '1234') ||
+        (username === 'admin1' && password === 'password123') ||
+        (username === 'admin2' && password === 'password123') ||
+        (username === 'medico1' && password === 'password123')) {
+      let userData;
+      if (username === 'admin' || username === 'admin1') {
+        userData = {
+          id_usuario: 1,
+          usuario: username,
+          rol: 'Administrativo',
+          nombre: 'María Pérez',
+        };
+      } else if (username === 'admin2') {
+        userData = {
+          id_usuario: 2,
+          usuario: username,
+          rol: 'Administrador',
+          nombre: 'Andrés Gómez',
+        };
+      } else if (username === 'medico1') {
+        userData = {
+          id_usuario: 3,
+          usuario: username,
+          rol: 'Médico',
+          nombre: 'Dr. Juan Díaz',
+          id_medico_fk: 2,
+        };
+      }
 
-function handlePacientes(method, params) {
+      return {
+        data: {
+          token: 'jwt_token_mock',
+          user: userData,
+        },
+      };
+    }
+
+    throw new Error('Usuario o contraseña incorrectos');
+  }
+
+  if (method === 'GET' && action === 'me') {
+    return {
+      data: {
+        id_usuario: 1,
+        usuario: 'admin',
+        rol: 'Administrativo',
+      },
+    };
+  }
+
+  return { data: null };
+}
+
+function handlePacientes(method, params, resourceId) {
   if (method === 'GET') {
-    if (params?.id_paciente) {
-      const data = store.pacientes.filter((paciente) => paciente.id_paciente === params.id_paciente);
-      return { data };
+    if (resourceId) {
+      const paciente = store.pacientes.find((item) => item.id_paciente === resourceId);
+      return { data: paciente ?? null };
     }
 
     const queryValue = params?.query ?? '';
@@ -216,19 +303,45 @@ function handlePacientes(method, params) {
   }
 
   if (method === 'POST') {
-    const nuevo = { id_paciente: store.pacientes.length + 1, ...params };
+    const nuevo = {
+      id_paciente: store.pacientes.length ? Math.max(...store.pacientes.map((paciente) => paciente.id_paciente)) + 1 : 1,
+      sexo: params?.sexo ?? null,
+      tipo_sangre: params?.tipo_sangre ?? null,
+      alergias: Array.isArray(params?.alergias) ? params.alergias : [],
+      antecedentes: params?.antecedentes ?? '',
+      contactos: Array.isArray(params?.contactos) ? params.contactos : [],
+      ...params,
+    };
     store.pacientes.push(nuevo);
     return { data: nuevo };
+  }
+
+  if (method === 'PUT') {
+    const pacienteId = resourceId || params?.id_paciente;
+    const index = store.pacientes.findIndex((paciente) => paciente.id_paciente === pacienteId);
+    if (index === -1) {
+      return { data: null };
+    }
+    store.pacientes[index] = {
+      ...store.pacientes[index],
+      ...params,
+      sexo: params?.sexo ?? store.pacientes[index].sexo,
+      tipo_sangre: params?.tipo_sangre ?? store.pacientes[index].tipo_sangre,
+      alergias: params?.alergias ?? store.pacientes[index].alergias,
+      antecedentes: params?.antecedentes ?? store.pacientes[index].antecedentes,
+      contactos: Array.isArray(params?.contactos) ? params.contactos : store.pacientes[index].contactos,
+    };
+    return { data: store.pacientes[index] };
   }
 
   return { data: [] };
 }
 
-function handleMedicos(method, params) {
+function handleMedicos(method, params, resourceId) {
   if (method === 'GET') {
-    if (params?.id_medico) {
-      const data = store.medicos.filter((medico) => medico.id_medico === params.id_medico);
-      return { data };
+    if (resourceId) {
+      const medico = store.medicos.find((item) => item.id_medico === resourceId);
+      return { data: medico ? [medico] : [] };
     }
 
     const queryValue = params?.query ?? '';
@@ -250,7 +363,7 @@ function handleMedicos(method, params) {
   }
 
   if (method === 'PUT') {
-    const medicoId = params?.id_medico;
+    const medicoId = resourceId || params?.id_medico;
     const index = store.medicos.findIndex((medico) => medico.id_medico === medicoId);
     if (index === -1) {
       return { data: null };
@@ -265,26 +378,64 @@ function handleMedicos(method, params) {
   return { data: [] };
 }
 
-function handleCitas(method, params) {
-  console.log('🔍 [DEBUG mockApi] handleCitas called with method:', method, 'params:', params);
-  console.log('🔍 [DEBUG mockApi] Current store.citas:', store.citas);
-  
+function handleCitas(method, params, resourceId, action) {
   if (method === 'GET') {
+    if (resourceId) {
+      const cita = store.citas.find((item) => item.id_cita === resourceId);
+      return { data: cita ?? null };
+    }
+
     const data = store.citas.filter((cita) => {
       if (!params) return true;
       if (params.medicoId && cita.id_medico_fk !== params.medicoId) return false;
       if (params.pacienteId && cita.id_paciente_fk !== params.pacienteId) return false;
+      if (params.estado && params.estado !== 'Todas' && params.estado !== '') return cita.estado === params.estado;
       return true;
     });
-    console.log('🔍 [DEBUG mockApi] handleCitas returning:', data);
     return { data };
   }
 
   if (method === 'POST') {
-    const nuevo = { id_cita: store.citas.length + 1, estado: 'Agendada', ...params };
+    const nuevo = {
+      id_cita: store.citas.length ? Math.max(...store.citas.map((cita) => cita.id_cita)) + 1 : 1,
+      estado: 'Agendada',
+      ...params,
+    };
     store.citas.push(nuevo);
-    store.historial_citas.push({ id_historial: store.historial_citas.length + 1, id_cita_fk: nuevo.id_cita, estado: 'Agendada', fecha: new Date().toISOString() });
+    store.historial_citas.push({
+      id_historial: store.historial_citas.length + 1,
+      id_cita_fk: nuevo.id_cita,
+      estado: 'Agendada',
+      fecha: new Date().toISOString(),
+    });
     return { data: nuevo };
+  }
+
+  if (method === 'PUT') {
+    if (action === 'cancelar' && resourceId) {
+      const index = store.citas.findIndex((item) => item.id_cita === resourceId);
+      if (index === -1) {
+        return { data: null };
+      }
+      store.citas[index] = {
+        ...store.citas[index],
+        estado: 'Cancelada',
+        observacion: params?.motivo || store.citas[index].observacion,
+      };
+      return { data: store.citas[index] };
+    }
+
+    const citaId = resourceId || params?.id_cita;
+    const index = store.citas.findIndex((item) => item.id_cita === citaId);
+    if (index === -1) {
+      return { data: null };
+    }
+    store.citas[index] = {
+      ...store.citas[index],
+      ...params,
+      estado: params?.estado || store.citas[index].estado,
+    };
+    return { data: store.citas[index] };
   }
 
   return { data: [] };
@@ -307,8 +458,7 @@ function handleConsultas(method, params) {
     };
     store.consultas.push(nueva);
 
-    // Registrar cambio de cita a "Atendida"
-    if (params.id_cita_fk) {
+    if (params?.id_cita_fk) {
       const cita = store.citas.find((c) => c.id_cita === params.id_cita_fk);
       if (cita && cita.estado !== 'Atendida') {
         store.historial_citas.push({
@@ -340,7 +490,6 @@ function handleHistorialCitas(method, params) {
 
 function handleHistoriasClinicas(method, params) {
   if (method === 'GET') {
-    // Contrato flexible: si viene pacienteId, filtramos; si no, devolvemos todo.
     if (params?.pacienteId) {
       const data = store.historias_clinicas.filter((h) => h.id_paciente_fk === params.pacienteId);
       return { data };
@@ -392,7 +541,6 @@ function handleSignosVitales(method, params) {
   }
 
   if (method === 'GET') {
-    // Útil futuro: filtrar por consulta
     if (params?.id_consulta_fk) {
       return { data: store.signos_vitales.filter((s) => s.id_consulta_fk === params.id_consulta_fk) };
     }

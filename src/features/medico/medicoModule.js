@@ -6,6 +6,7 @@
   getServicios,
   buscarPacientes,
 } from './medicoService.js';
+import { showToast } from '../../utils/toast.js';
 
 let medicoActual = null;
 let serviciosDisponibles = [];
@@ -171,8 +172,8 @@ function initializeUI() {
 function renderDashboardStats() {
   const hoy = new Date().toISOString().split('T')[0];
   const citasHoyCount = todasCitas.filter((c) => c.fecha === hoy).length;
-  const citasPendientes = todasCitas.filter((c) => c.estado === 'Agendada' || c.estado === 'Pendiente').length;
-  const citasAtendidas = todasCitas.filter((c) => c.estado === 'Atendida' || c.estado === 'Completada').length;
+  const citasPendientes = todasCitas.filter((c) => c.estado === 'Agendada').length;
+  const citasAtendidas = todasCitas.filter((c) => c.estado === 'Atendida').length;
 
   const citasHoyEl = document.getElementById('medico-citas-hoy-count');
   const citasPendientesEl = document.getElementById('medico-citas-pendientes-count');
@@ -208,7 +209,7 @@ function renderMisCitas(citas = todasCitas) {
           <p class="mb-1"><strong>Paciente:</strong> ${cita.id_paciente_fk}</p>
           <p class="mb-1"><strong>Observación:</strong> ${cita.observacion || 'Sin observaciones'}</p>
           <div class="d-flex gap-2 flex-wrap mt-3">
-            ${cita.estado === 'Atendida' || cita.estado === 'Completada' 
+            ${cita.estado === 'Atendida' 
               ? `<button class="btn btn-sm btn-info verObservacionesBtn" data-cita-id="${cita.id_cita}">
                   <i class="fas fa-notes-medical"></i> Ver observaciones
                 </button>`
@@ -423,11 +424,18 @@ function renderCitasTable(citas) {
   }
 
   citasTableBody.innerHTML = citas
-    .map((cita) => `
+    .map((cita) => {
+      const pacienteNombre = cita.paciente?.nombre || cita.paciente_nombre || cita.nombre_paciente || cita.pacienteNombre || '';
+      const pacienteApellido = cita.paciente?.primer_apellido || cita.paciente?.segundo_apellido || cita.paciente_apellido || cita.pacienteApellido || cita.paciente?.apellido || '';
+      const pacienteEtiqueta = pacienteNombre
+        ? `${pacienteNombre}${pacienteApellido ? ` ${pacienteApellido}` : ''}`
+        : 'Paciente sin datos';
+
+      return `
       <tr>
         <td>${cita.fecha}</td>
         <td>${cita.hora}</td>
-        <td>Paciente ${cita.id_paciente_fk}</td>
+        <td>${pacienteEtiqueta}</td>
         <td><span class="badge bg-${getEstadoBadgeColor(cita.estado)}">${cita.estado}</span></td>
         <td>${cita.observacion || '—'}</td>
         <td>
@@ -441,7 +449,8 @@ function renderCitasTable(citas) {
           </button>
         </td>
       </tr>
-    `)
+    `;
+    })
     .join('');
 
   citasTableBody.querySelectorAll('.abrirConsultaBtn').forEach((btn) => {
@@ -491,9 +500,9 @@ function handleFilterCitas() {
   if (filterValue === 'hoy') {
     filtered = todasCitas.filter((c) => c.fecha === hoy);
   } else if (filterValue === 'pendientes') {
-    filtered = todasCitas.filter((c) => c.estado === 'Agendada' || c.estado === 'Pendiente');
+    filtered = todasCitas.filter((c) => c.estado === 'Agendada');
   } else if (filterValue === 'atendidas') {
-    filtered = todasCitas.filter((c) => c.estado === 'Atendida' || c.estado === 'Completada');
+    filtered = todasCitas.filter((c) => c.estado === 'Atendida');
   } else if (filterValue === 'todas') {
     filtered = todasCitas;
   }
@@ -546,11 +555,10 @@ async function abrirRegistroConsultaModal(cita) {
       }
     }
 
-    // Tipo de sangre (simulado)
+    // Tipo de sangre del paciente
     if (sangreEncabezado) {
-      const tipos = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
-      const tipoAleatorio = tipos[Math.floor(Math.random() * tipos.length)];
-      sangreEncabezado.textContent = tipoAleatorio;
+      const tipoSangre = paciente.tipo_sangre || paciente.grupo_sanguineo || 'No registrado';
+      sangreEncabezado.textContent = tipoSangre;
     }
 
     // ========================================
@@ -560,29 +568,33 @@ async function abrirRegistroConsultaModal(cita) {
     const alergiasDiv = document.getElementById('registro-alergias');
 
     if (alergiasContainer && alergiasDiv) {
-      // Simular alergias desde datos (en futuro vendrá del paciente)
-      const alergias = paciente.alergias ? 
-        (Array.isArray(paciente.alergias) ? paciente.alergias : [paciente.alergias]) 
-        : [];
+      // TODO: consumir desde API de historial clínico
+      const alergias = Array.isArray(paciente.alergias)
+        ? paciente.alergias
+        : paciente.alergias
+          ? [paciente.alergias]
+          : Array.isArray(paciente.historial?.alergias)
+            ? paciente.historial.alergias
+            : paciente.historial?.alergias
+              ? [paciente.historial.alergias]
+              : [];
 
-      // Alergias comunes simuladas para demostración
-      const alergiasDemo = ['Penicilina', 'Ibuprofeno'];
-
-      if (alergias.length > 0 || alergiasDemo.length > 0) {
-        const todasAlergias = alergias.length > 0 ? alergias : alergiasDemo;
-        alergiasDiv.innerHTML = todasAlergias
+      if (alergias.length > 0) {
+        alergiasDiv.innerHTML = alergias
           .map(
             (alergia) => `
-            <div class=\"alert alert-warning alert-sm py-2 px-3 mb-0\" style=\"display: inline-block; border-radius: 20px; font-size: 0.85rem;\">
-              <i class=\"fas fa-exclamation-triangle\"></i> <strong>Alergia:</strong> ${alergia}
+            <div class="alert alert-warning alert-sm py-2 px-3 mb-0" style="display: inline-block; border-radius: 20px; font-size: 0.85rem;">
+              <i class="fas fa-exclamation-triangle"></i> <strong>Alergia:</strong> ${alergia}
             </div>
           `
           )
           .join('');
-        alergiasContainer.style.display = 'block';
       } else {
-        alergiasContainer.style.display = 'none';
+        alergiasDiv.innerHTML = `
+          <div class="text-muted small">No registrado</div>
+        `;
       }
+      alergiasContainer.style.display = 'block';
     }
 
     // ========================================
@@ -656,7 +668,7 @@ async function handleRegistrarConsulta(event) {
   event.preventDefault();
 
   if (!currentCitaForConsulta) {
-    alert('Error: No hay cita seleccionada');
+    showToast('Error: No hay cita seleccionada', 'error');
     return;
   }
 
@@ -668,12 +680,12 @@ async function handleRegistrarConsulta(event) {
 
   // Validaciones
   if (!diagnostico) {
-    alert('El diagnóstico es requerido');
+    showToast('El diagnóstico es requerido', 'error');
     return;
   }
 
   if (serviciosSeleccionados.length === 0) {
-    alert('Debe seleccionar al menos un servicio');
+    showToast('Debe seleccionar al menos un servicio', 'error');
     return;
   }
 
@@ -689,7 +701,7 @@ async function handleRegistrarConsulta(event) {
 
   const validationError = validateSignosVitales(signosVitales);
   if (validationError) {
-    alert(validationError);
+    showToast(validationError, 'error');
     return;
   }
 
@@ -702,7 +714,7 @@ async function handleRegistrarConsulta(event) {
       signos_vitales: signosVitales, // Agregar signos vitales al payload
     });
 
-    alert('✅ Consulta registrada exitosamente');
+    showToast('Consulta registrada exitosamente', 'success');
     if (registroConsultaModal) registroConsultaModal.hide();
     registroConsultaForm?.reset();
 
@@ -712,7 +724,7 @@ async function handleRegistrarConsulta(event) {
     handleFilterCitas();
   } catch (error) {
     console.error('Error registrando consulta:', error);
-    alert('❌ Error al registrar la consulta: ' + (error.message || error));
+    showToast('Error al registrar la consulta: ' + (error.message || error), 'error');
   }
 }
 
@@ -768,19 +780,22 @@ async function mostrarObservacionesCita(cita) {
     modal.addEventListener('hidden.bs.modal', () => modal.remove());
   } catch (error) {
     console.error('Error cargando observaciones:', error);
-    alert('Error al cargar las observaciones de la cita.');
+    showToast('Error al cargar las observaciones de la cita.', 'error');
   }
 }
 
 function mostrarDetallesCita(cita) {
-  alert(`Cita del ${cita.fecha} a las ${cita.hora}\nPaciente: ${cita.id_paciente_fk}\nEstado: ${cita.estado}\nObservación: ${cita.observacion || 'N/A'}`);
+  showToast(
+    `Cita del ${cita.fecha} a las ${cita.hora}\nPaciente: ${cita.id_paciente_fk}\nEstado: ${cita.estado}\nObservación: ${cita.observacion || 'N/A'}`,
+    'info'
+  );
 }
 
 function getEstadoBadgeColor(estado) {
   const estadoLower = estado?.toLowerCase() || '';
-  if (estadoLower.includes('agendada') || estadoLower.includes('pendiente')) return 'warning';
-  if (estadoLower.includes('atendida') || estadoLower.includes('completada')) return 'success';
-  if (estadoLower.includes('cancelada') || estadoLower.includes('rechazada')) return 'danger';
+  if (estadoLower === 'agendada') return 'warning';
+  if (estadoLower === 'atendida') return 'success';
+  if (estadoLower === 'cancelada') return 'danger';
   return 'secondary';
 }
 

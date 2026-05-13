@@ -1,4 +1,5 @@
 import { fetchUsers, fetchMedicos, getUserById, saveUser, toggleUserStatus } from './administradorService.js';
+import { showToast } from '../../utils/toast.js';
 
 let usersTableBody;
 let newUserBtn;
@@ -136,12 +137,12 @@ async function handleSaveUser() {
   const id_medico_fk = role === 'Médico' ? Number(doctorSelect.value) || null : null;
 
   if (!username || !role) {
-    alert('Usuario y rol son obligatorios.');
+    showToast('Usuario y rol son obligatorios.', 'error');
     return;
   }
 
   if (!userId && !password) {
-    alert('La contraseña es obligatoria al crear un usuario.');
+    showToast('La contraseña es obligatoria al crear un usuario.', 'error');
     return;
   }
 
@@ -161,7 +162,7 @@ async function handleSaveUser() {
     const modal = bootstrap.Modal.getInstance(userModalEl);
     if (modal) modal.hide();
   } catch (error) {
-    alert(error.message || 'No se pudo guardar el usuario.');
+    showToast(error.message || 'No se pudo guardar el usuario.', 'error');
   }
 }
 

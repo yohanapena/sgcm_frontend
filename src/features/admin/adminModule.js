@@ -1,39 +1,13 @@
 import { searchPacientes, createPaciente } from '../pacientes/pacientesService.js';
-import { createCita } from '../citas/citasService.js';
-import { magicLoop } from '../../api/magicLoops.js';
+import { createCita, getEspecialidades, getMedicos } from '../citas/citasService.js';
+import { apiGateway } from '../../api/apiGateway.js';
+import { showToast } from '../../utils/toast.js';
 
 let currentAdminAppointmentFilter = 'todas';
 const adminDashboardCache = {
   pacientes: [],
   citas: [],
   medicos: [],
-};
-
-const users = [
-  { id: 1, username: 'admin1', role: 'Administrativo', status: 'Activo', doctorId: null },
-  { id: 2, username: 'medico1', role: 'Medico', status: 'Activo', doctorId: 1 },
-];
-
-// Mock data — solo Medicina General y Odontología según SRS
-const MOCK_ESPECIALIDADES = [
-  { id: 1, nombre: 'Medicina General', icono: 'fa-user-md', descripcion: 'Consulta médica general' },
-  { id: 2, nombre: 'Odontología', icono: 'fa-tooth', descripcion: 'Atención odontológica' },
-];
-
-const MOCK_MEDICOS = [
-  { id: 1, nombre: 'Carlos', primer_apellido: 'Ramírez', tarjeta_profesional: 'TP-001', especialidades: [1] },
-  { id: 2, nombre: 'Laura', primer_apellido: 'Gómez', tarjeta_profesional: 'TP-002', especialidades: [1] },
-  { id: 3, nombre: 'Pedro', primer_apellido: 'Sánchez', tarjeta_profesional: 'TP-003', especialidades: [2] },
-  { id: 4, nombre: 'Ana', primer_apellido: 'Torres', tarjeta_profesional: 'TP-004', especialidades: [2] },
-];
-
-const MOCK_HORARIOS = {
-  Lunes:     [{ hora: '08:00', estado: 'disponible' }, { hora: '09:00', estado: 'disponible' }, { hora: '10:00', estado: 'ocupado' },    { hora: '11:00', estado: 'disponible' }, { hora: '12:00', estado: 'ocupado' }],
-  Martes:    [{ hora: '08:00', estado: 'ocupado' },    { hora: '09:00', estado: 'disponible' }, { hora: '10:00', estado: 'disponible' }, { hora: '11:00', estado: 'disponible' }, { hora: '12:00', estado: 'disponible' }],
-  Miércoles: [{ hora: '08:00', estado: 'disponible' }, { hora: '09:00', estado: 'disponible' }, { hora: '10:00', estado: 'ocupado' },    { hora: '11:00', estado: 'ocupado' },    { hora: '12:00', estado: 'disponible' }],
-  Jueves:    [{ hora: '08:00', estado: 'ocupado' },    { hora: '09:00', estado: 'ocupado' },    { hora: '10:00', estado: 'disponible' }, { hora: '11:00', estado: 'disponible' }, { hora: '12:00', estado: 'disponible' }],
-  Viernes:   [{ hora: '08:00', estado: 'disponible' }, { hora: '09:00', estado: 'ocupado' },    { hora: '10:00', estado: 'disponible' }, { hora: '11:00', estado: 'disponible' }, { hora: '12:00', estado: 'disponible' }],
-  Sábado:    [{ hora: '08:00', estado: 'disponible' }, { hora: '09:00', estado: 'disponible' }, { hora: '10:00', estado: 'disponible' }, { hora: '11:00', estado: 'ocupado' },    { hora: '12:00', estado: 'ocupado' }],
 };
 
 // Nombres fijos de los pasos — fuente de verdad única
@@ -79,17 +53,35 @@ function registerPatientForm() {
 
     try {
       const response = await createPaciente(data);
-      if (response?.data) {
+      if (response?.id_paciente) {
         form.reset();
-        alert('Paciente creado correctamente');
+        showToast('Paciente creado correctamente', 'success');
       } else {
-        alert('Error al crear el paciente');
+        showToast('Error al crear el paciente', 'error');
       }
     } catch (error) {
       console.error('Error creando paciente:', error);
-      alert('Error al crear el paciente: ' + error.message);
+      showToast('Error al crear el paciente: ' + error.message, 'error');
     }
   });
+}
+
+/**
+ * Devuelve la fecha ISO (YYYY-MM-DD) del próximo día de la semana indicado.
+ * Esta función es solo para uso en mocks/desarrollo y no debe usarse en producción
+ * cuando el backend ya provee la fecha exacta del horario.
+ * Ejemplo: getNextDateForDay('Lunes') → '2026-05-18'
+ */
+function getNextDateForDay(dayName) {
+  const dayMap = { Lunes: 1, Martes: 2, Miércoles: 3, Jueves: 4, Viernes: 5, Sábado: 6, Domingo: 0 };
+  const target = dayMap[dayName];
+  if (target === undefined) return new Date().toISOString().split('T')[0];
+  const today = new Date();
+  const current = today.getDay();
+  const diff = (target - current + 7) % 7 || 7; // si es hoy, toma el de la próxima semana
+  const next = new Date(today);
+  next.setDate(today.getDate() + diff);
+  return next.toISOString().split('T')[0];
 }
 
 function registerAppointmentWizard() {
@@ -177,17 +169,29 @@ function registerAppointmentWizard() {
     return iconMap[nombre] || 'fas fa-stethoscope';
   }
 
-  function populateSpecialties() {
+  async function populateSpecialties() {
     if (!specialtyCardsContainer) return;
 
-    specialtyCardsContainer.innerHTML = MOCK_ESPECIALIDADES.map(
+    specialtyCardsContainer.innerHTML = '<div class="col-12 text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Cargando especialidades...</div>';
+
+    let especialidades = [];
+    try {
+      const response = await getEspecialidades();
+      especialidades = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
+    } catch (error) {
+      console.error('Error cargando especialidades:', error);
+      specialtyCardsContainer.innerHTML = '<div class="col-12 text-center text-danger py-3">Error al cargar especialidades.</div>';
+      return;
+    }
+
+    specialtyCardsContainer.innerHTML = especialidades.map(
       (esp) => `
         <div class="col-md-6 mb-4">
-          <div class="card specialty-card h-100" data-id="${esp.id}" style="cursor:pointer; transition: border 0.2s, box-shadow 0.2s;">
+          <div class="card specialty-card h-100" data-id="${esp.id_especialidad ?? esp.id}" style="cursor:pointer; transition: border 0.2s, box-shadow 0.2s;">
             <div class="card-body text-center d-flex flex-column justify-content-center py-4">
               <i class="${getSpecialtyIcon(esp.nombre)} fa-4x mb-3 text-primary"></i>
               <h5 class="card-title fw-semibold">${esp.nombre}</h5>
-              <p class="card-text text-muted small">${esp.descripcion}</p>
+              <p class="card-text text-muted small">${esp.descripcion ?? ''}</p>
             </div>
           </div>
         </div>
@@ -206,7 +210,7 @@ function registerAppointmentWizard() {
         card.style.boxShadow = '0 0 0 3px rgba(26,107,181,0.15)';
 
         const especialidadId = Number(card.dataset.id);
-        const especialidad = MOCK_ESPECIALIDADES.find((e) => e.id === especialidadId);
+        const especialidad = especialidades.find((e) => (e.id_especialidad ?? e.id) === especialidadId);
         citaWizard.especialidad = especialidad;
         citaWizard.medico = null;
         loadDoctors(especialidadId);
@@ -218,7 +222,23 @@ function registerAppointmentWizard() {
   async function loadDoctors(especialidadId) {
     if (!doctorContainer) return;
 
-    const medicos = MOCK_MEDICOS.filter((m) => m.especialidades.includes(especialidadId));
+    doctorContainer.innerHTML = '<div class="col-12 text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Cargando médicos...</div>';
+
+    let medicos = [];
+    try {
+      const response = await getMedicos();
+      const todos = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
+      // Filtrar por especialidad si el médico tiene el campo id_especialidad_fk o especialidades[]
+      medicos = todos.filter((m) => {
+        if (Array.isArray(m.especialidades)) return m.especialidades.includes(especialidadId);
+        if (m.id_especialidad_fk) return m.id_especialidad_fk === especialidadId;
+        return true; // si el backend no filtra, mostramos todos
+      });
+    } catch (error) {
+      console.error('Error cargando médicos:', error);
+      doctorContainer.innerHTML = '<div class="col-12 text-center text-danger py-3">Error al cargar médicos.</div>';
+      return;
+    }
 
     if (medicos.length === 0) {
       doctorContainer.innerHTML = '<div class="col-12 text-center text-muted py-3">No hay médicos disponibles para esta especialidad.</div>';
@@ -228,11 +248,11 @@ function registerAppointmentWizard() {
     doctorContainer.innerHTML = medicos.map(
       (medico) => `
         <div class="col-md-6 mb-3">
-          <div class="card doctor-card h-100" data-id="${medico.id}" data-nombre="${medico.nombre} ${medico.primer_apellido}" style="cursor:pointer; transition: border 0.2s;">
+          <div class="card doctor-card h-100" data-id="${medico.id_medico ?? medico.id}" data-nombre="${medico.nombre} ${medico.primer_apellido ?? medico.apellido ?? ''}" style="cursor:pointer; transition: border 0.2s;">
             <div class="card-body text-center">
               <i class="fas fa-user-md fa-2x mb-2 text-primary"></i>
-              <h6 class="card-title fw-semibold">${medico.nombre} ${medico.primer_apellido}</h6>
-              <p class="card-text text-muted small">TP: ${medico.tarjeta_profesional}</p>
+              <h6 class="card-title fw-semibold">${medico.nombre} ${medico.primer_apellido ?? medico.apellido ?? ''}</h6>
+              <p class="card-text text-muted small">${medico.tarjeta_profesional ? `TP: ${medico.tarjeta_profesional}` : ''}</p>
             </div>
           </div>
         </div>
@@ -257,10 +277,40 @@ function registerAppointmentWizard() {
     });
   }
 
-  function renderScheduleSlots() {
+  async function renderScheduleSlots() {
     if (!scheduleContainer) return;
 
-    const days = Object.keys(MOCK_HORARIOS);
+    scheduleContainer.innerHTML = '<div class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Cargando horarios...</div>';
+
+    let horariosArray = [];
+    try {
+      const medicoId = citaWizard.medico?.id_medico;
+      const response = await apiGateway({ resource: 'horarios', method: 'GET', params: medicoId ? { medico_id: medicoId } : {} });
+      horariosArray = Array.isArray(response?.data) ? response.data : [];
+    } catch (error) {
+      console.error('Error cargando horarios:', error);
+      scheduleContainer.innerHTML = '<div class="text-center text-danger py-3">Error al cargar horarios.</div>';
+      return;
+    }
+
+    // Transformar array en objeto agrupado por día
+    const horariosRaw = {};
+    horariosArray.forEach(horario => {
+      if (!horariosRaw[horario.dia]) {
+        horariosRaw[horario.dia] = [];
+      }
+      horariosRaw[horario.dia].push({
+        hora: horario.hora,
+        estado: 'disponible', // Por ahora todos disponibles, luego se puede filtrar por citas existentes
+        fecha: null // No hay fecha específica en los datos actuales
+      });
+    });
+
+    const days = Object.keys(horariosRaw);
+    if (days.length === 0) {
+      scheduleContainer.innerHTML = '<div class="text-center text-muted py-3">No hay horarios disponibles para este médico.</div>';
+      return;
+    }
 
     scheduleContainer.innerHTML = `
       <div class="d-flex justify-content-end mb-2 gap-3">
@@ -272,10 +322,11 @@ function registerAppointmentWizard() {
         ${days.map((day) => `
           <div class="calendar-day flex-fill" style="min-width:100px;">
             <div class="calendar-day-name fw-bold text-primary text-center mb-1">${day}</div>
-            ${MOCK_HORARIOS[day].map((slot) => `
+            ${horariosRaw[day].map((slot) => `
               <div class="time-slot schedule-slot mb-1 text-center rounded p-1 ${slot.estado === 'disponible' ? 'clickable' : ''}"
                 data-hora="${slot.hora}"
                 data-day="${day}"
+                data-fecha="${slot.fecha ?? ''}"
                 style="
                   background: ${slot.estado === 'disponible' ? '#d4edda' : '#f8d7da'};
                   color: ${slot.estado === 'disponible' ? '#155724' : '#721c24'};
@@ -297,7 +348,7 @@ function registerAppointmentWizard() {
         scheduleContainer.querySelectorAll('.schedule-slot').forEach((s) => {
           const day = s.dataset.day;
           const hora = s.dataset.hora;
-          const originalSlot = MOCK_HORARIOS[day]?.find((h) => h.hora === hora);
+          const originalSlot = horariosRaw[day]?.find((h) => h.hora === hora);
           if (originalSlot) {
             s.style.background = originalSlot.estado === 'disponible' ? '#d4edda' : '#f8d7da';
             s.style.color = originalSlot.estado === 'disponible' ? '#155724' : '#721c24';
@@ -309,7 +360,12 @@ function registerAppointmentWizard() {
         slot.style.color = '#fff';
         slot.style.border = '1px solid #1A6BB5';
 
-        citaWizard.horario = { dia: slot.dataset.day, hora: slot.dataset.hora };
+        // Guardar fecha real si viene del backend, o el día como fallback
+        citaWizard.horario = {
+          dia: slot.dataset.day,
+          hora: slot.dataset.hora,
+          fecha: slot.dataset.fecha || null,
+        };
         updateSelectedScheduleDisplay();
         if (step4Error) step4Error.textContent = '';
       });
@@ -329,10 +385,17 @@ function registerAppointmentWizard() {
 
     if (confirmPatient) confirmPatient.textContent = `${citaWizard.paciente.nombre} ${citaWizard.paciente.primer_apellido}`;
     if (confirmIdentificacion) confirmIdentificacion.textContent = citaWizard.paciente.numero_identificacion;
-    if (confirmEps) confirmEps.textContent = citaWizard.paciente.id_eps_fk || 'No registrado';
+    // Mostrar nombre de EPS si está disponible, no el ID
+    const epsNombre = citaWizard.paciente.eps_nombre
+      || citaWizard.paciente.eps
+      || (citaWizard.paciente.id_eps_fk ? `EPS #${citaWizard.paciente.id_eps_fk}` : 'No registrado');
+    if (confirmEps) confirmEps.textContent = epsNombre;
     if (confirmMedico) confirmMedico.textContent = citaWizard.medico.nombre;
     if (confirmEspecialidad) confirmEspecialidad.textContent = citaWizard.especialidad.nombre;
-    if (confirmFechaHora) confirmFechaHora.textContent = `${citaWizard.horario.dia} ${citaWizard.horario.hora}`;
+    const fechaDisplay = citaWizard.horario.fecha
+      ? `${citaWizard.horario.fecha} ${citaWizard.horario.hora}`
+      : `${citaWizard.horario.dia} ${citaWizard.horario.hora}`;
+    if (confirmFechaHora) confirmFechaHora.textContent = fechaDisplay;
   }
 
   function resetWizard() {
@@ -344,8 +407,8 @@ function registerAppointmentWizard() {
     citaWizard.horario = null;
     if (observationsInput) observationsInput.value = '';
     if (doctorContainer) doctorContainer.innerHTML = '<div class="col-12"><p class="text-muted">Selecciona una especialidad primero para ver los médicos disponibles.</p></div>';
-    populateSpecialties();
-    renderScheduleSlots();
+    if (scheduleContainer) scheduleContainer.innerHTML = '<div class="text-center text-muted py-3">Selecciona un médico primero para ver los horarios.</div>';
+    populateSpecialties(); // async, no necesita await aquí
     updateSelectedScheduleDisplay();
     goToStep(0);
     clearStepErrors();
@@ -410,8 +473,7 @@ function registerAppointmentWizard() {
   }
 
   // Inicializar
-  populateSpecialties();
-  renderScheduleSlots();
+  populateSpecialties(); // async, carga desde gateway
   goToStep(0);
 
   // Nueva cita reset
@@ -447,6 +509,7 @@ function registerAppointmentWizard() {
       return;
     }
     goToStep(3);
+    renderScheduleSlots(); // cargar horarios del médico seleccionado
   });
 
   step4Prev?.addEventListener('click', () => goToStep(2));
@@ -466,11 +529,17 @@ function registerAppointmentWizard() {
       return;
     }
 
+    if (!citaWizard.horario?.fecha) {
+      showWizardAlert('danger', 'La fecha del horario no está disponible. Regresa a selección de horario.');
+      goToStep(3);
+      return;
+    }
+
     appointmentConfirmBtn.disabled = true;
     appointmentConfirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
 
     const payload = {
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: citaWizard.horario.fecha,
       hora: citaWizard.horario.hora,
       id_paciente_fk: citaWizard.paciente.id_paciente,
       id_medico_fk: citaWizard.medico.id_medico,
@@ -536,7 +605,7 @@ function registerAppointmentFilters() {
     const estado = estadoSelect?.value;
 
     try {
-      const response = await magicLoop({ resource: 'citas', method: 'GET' });
+      const response = await apiGateway({ resource: 'citas', method: 'GET' });
       let citas = response?.data || [];
 
       if (fechaInicio) citas = citas.filter((c) => c.fecha >= fechaInicio);
@@ -597,9 +666,9 @@ async function renderAdministrativoDashboard() {
 
   try {
     const [pacientesResp, citasResp, medicosResp] = await Promise.all([
-      magicLoop({ resource: 'pacientes', method: 'GET' }),
-      magicLoop({ resource: 'citas', method: 'GET' }),
-      magicLoop({ resource: 'medicos', method: 'GET' }),
+      apiGateway({ resource: 'pacientes', method: 'GET' }),
+      apiGateway({ resource: 'citas', method: 'GET' }),
+      apiGateway({ resource: 'medicos', method: 'GET' }),
     ]);
 
     const pacientes = pacientesResp?.data || [];

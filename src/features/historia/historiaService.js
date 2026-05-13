@@ -1,9 +1,9 @@
-import { magicLoop } from '../../api/magicLoops.js';
+import { apiGateway } from '../../api/apiGateway.js';
 
 export async function getHistoriaClinica(pacienteId) {
-  return magicLoop({ resource: 'historia_clinica', method: 'GET', params: { pacienteId } });
+  return apiGateway({ resource: 'historias_clinicas', method: 'GET', params: { pacienteId } });
 }
 
 export async function listConsultas(pacienteId) {
-  return magicLoop({ resource: 'consultas', method: 'GET', params: { pacienteId } });
+  return apiGateway({ resource: 'consultas', method: 'GET', params: { pacienteId } });
 }

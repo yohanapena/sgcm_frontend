@@ -1,24 +1,8 @@
-import { MEDICOS } from '../../data/medicos.js';
-import { magicLoop } from '../../api/magicLoops.js';
+import { apiGateway, USE_MOCKS } from '../../api/apiGateway.js';
 import { localUsers, createLocalUser, updateLocalUser, toggleLocalUserStatus } from './administradorStore.js';
 
-const API_URL = 'http://localhost:4000';
-
-export const apiConfig = {
-  apiUrl: API_URL,
-  fetchOptions: {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  },
-  // Si se agrega Axios en el futuro, se puede crear una instancia así:
-  // import axios from 'axios';
-  // export const axiosClient = axios.create({
-  //   baseURL: API_URL,
-  //   timeout: 10000,
-  //   headers: { 'Content-Type': 'application/json' },
-  // });
-};
+// Este servicio es mock-first: en modo mock, provoca la ruta de fallback local.
+// Cuando el backend esté disponible, apiGateway centraliza las llamadas HTTP.
 
 function isBackendUnavailable(error) {
   const message = String(error.message || '').toLowerCase();
@@ -31,26 +15,16 @@ function isBackendUnavailable(error) {
 }
 
 export async function apiFetch(path, { method = 'GET', body, headers = {} } = {}) {
-  const token = localStorage.getItem('jwtToken');
-  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const resource = path.startsWith('/') ? path.slice(1) : path;
+
+  if (USE_MOCKS) {
+    // En modo mock usamos el gateway (→ mockApi) para mantener el mismo contrato que el backend real.
+    // Si mockApi no implementa el endpoint, lanzará un error que el llamador puede manejar.
+    return apiGateway({ resource, method, params: body });
+  }
 
   try {
-    const response = await fetch(`${API_URL}${path}`, {
-      method,
-      headers: {
-        ...apiConfig.fetchOptions.headers,
-        ...authHeaders,
-        ...headers,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || `Error ${response.status}`);
-    }
-
-    return response.json();
+    return await apiGateway({ resource, method, params: body });
   } catch (error) {
     if (isBackendUnavailable(error)) {
       throw new Error('NETWORK_ERROR: No se pudo conectar con el backend');
@@ -99,8 +73,8 @@ export async function fetchMedicos() {
     }));
   } catch (error) {
     if (isBackendUnavailable(error)) {
-      const response = await magicLoop({ resource: 'medicos', method: 'GET' });
-      return (response.data || []).map((medico) => ({
+      const response = await apiGateway({ resource: 'medicos', method: 'GET' });
+      return (response || []).map((medico) => ({
         id_medico: medico.id_medico,
         nombre: medico.nombre,
         especialidad: medico.especialidad,
@@ -119,8 +93,8 @@ export async function saveMedico(payload) {
     return data;
   } catch (error) {
     if (isBackendUnavailable(error)) {
-      const response = await magicLoop({ resource: 'medicos', method: 'POST', params: payload });
-      return response.data;
+      const response = await apiGateway({ resource: 'medicos', method: 'POST', params: payload });
+      return response;
     }
     throw error;
   }
@@ -135,8 +109,8 @@ export async function updateMedico(id_medico, payload) {
     return data;
   } catch (error) {
     if (isBackendUnavailable(error)) {
-      const response = await magicLoop({ resource: 'medicos', method: 'PUT', params: { id_medico, ...payload } });
-      return response.data;
+      const response = await apiGateway({ resource: 'medicos', method: 'PUT', params: { id_medico, ...payload } });
+      return response;
     }
     throw error;
   }
@@ -174,11 +148,23 @@ export async function saveUser(payload) {
     if (!normalizedPayload.id_medico_fk) {
       throw new Error('Debe seleccionar un médico válido para el rol Médico.');
     }
-    const medico = MEDICOS.find((item) => item.id_medico === normalizedPayload.id_medico_fk);
-    if (!medico) {
-      throw new Error('El médico seleccionado no existe.');
+    // Validar el médico contra el gateway (mock o backend real), no contra el archivo local
+    try {
+      const medicos = await apiGateway({ resource: 'medicos', method: 'GET' });
+      const lista = Array.isArray(medicos) ? medicos : (medicos?.data ?? []);
+      const medico = lista.find((m) => m.id_medico === normalizedPayload.id_medico_fk);
+      if (!medico) {
+        throw new Error('El médico seleccionado no existe.');
+      }
+      normalizedPayload.nombre = medico.nombre;
+    } catch (error) {
+      if (!error.message.includes('no existe')) {
+        // Error de red o gateway — dejar pasar y que el backend valide
+        console.warn('No se pudo validar el médico localmente:', error.message);
+      } else {
+        throw error;
+      }
     }
-    normalizedPayload.nombre = medico.nombre;
   } else {
     if (!normalizedPayload.nombre) {
       throw new Error('El nombre es obligatorio para roles administrativo o administrador.');

@@ -1,10 +1,10 @@
-import { apiRequest } from '../../api/realApi.js';
+import { apiGateway, USE_MOCKS } from '../../api/apiGateway.js';
 import { mountMedicoModule } from '../medico/medicoModule.js';
 import { mountAdminModule } from '../admin/adminModule.js';
 import { mountAdministradorModule, renderUsers as renderAdministradorUsers } from '../administrador/administradorModule.js';
 import { mountPacientesModule } from '../pacientes/pacientesModule.js';
 import { mountAgendaModule } from '../citas/citasModule.js';
-import { findLocalUser, getLocalUsers } from '../administrador/administradorStore.js';
+import { findLocalUser } from '../administrador/administradorStore.js';
 
 let authenticatedUser = null;
 
@@ -13,7 +13,7 @@ export function getAuthenticatedUser() {
 }
 
 export async function fetchAuthenticatedUserProfile() {
-  return apiRequest({ path: '/auth/me', method: 'GET' });
+  return apiGateway({ resource: 'auth/me', method: 'GET' });
 }
 
 function formatUserDisplayName(user) {
@@ -36,8 +36,7 @@ function isBackendUnavailable(error) {
 }
 
 function shouldUseLocalFallback(error) {
-  const message = String(error.message || '').toLowerCase();
-  return isBackendUnavailable(error) || message.includes('error de comunicación') || message.includes('cannot post') || message.includes('not found') || message.includes('internal server error');
+  return isBackendUnavailable(error);
 }
 
 function isAdministrativeStaffRole(role) {
@@ -77,57 +76,79 @@ function normalizeUser(user) {
 }
 
 function fallbackLocalLogin({ usuario, contrasena }) {
-  console.log('Intentando login local con usuario:', usuario);
   const user = findLocalUser(usuario, contrasena);
-  console.log('Usuario encontrado:', user);
 
   if (!user) {
-    console.log('Usuario no encontrado o contraseña incorrecta');
-    return { success: false, error: 'Usuario o contraseña incorrectos' };
+      return { success: false, error: 'Usuario o contraseña incorrectos' };
   }
 
   if (user.status !== 'Activo') {
-    console.log('Usuario inactivo:', user.status);
-    return { success: false, error: 'Usuario inactivo', statusCode: 401 };
+      return { success: false, error: 'Usuario inactivo', statusCode: 401 };
   }
 
-  console.log('Login local exitoso para usuario:', user.nombre, 'rol:', user.rol);
   return { success: true, token: 'mock-jwt-token', user, backendFallback: true };
 }
 
 export async function login({ usuario, contrasena }) {
-  console.log('Iniciando proceso de login para usuario:', usuario);
+
+  if (USE_MOCKS) {
+    // En modo mock usamos el gateway (→ mockApi) para mantener el mismo contrato que el backend real
+    try {
+      console.log('[DEBUG] Intentando login con mock:', { usuario, contrasena });
+      const response = await apiGateway({
+        resource: 'auth/login',
+        method: 'POST',
+        params: { usuario, contrasena },
+      });
+      console.log('[DEBUG] Respuesta del mock:', response);
+      const { token, user: rawUser, usuario: rawUsuario } = response ?? {};
+      const userRaw = rawUser || rawUsuario;
+      if (!token || !userRaw) {
+        console.error('[DEBUG] Respuesta inválida:', { token, userRaw });
+        return { success: false, error: 'Respuesta inválida del servidor.' };
+      }
+      console.log('[DEBUG] Login exitoso:', { token, user: userRaw });
+      return { success: true, token, user: normalizeUser(userRaw) };
+    } catch (error) {
+      console.error('[DEBUG] Error en login mock:', error);
+      if (shouldUseLocalFallback(error)) {
+        console.warn('[auth] usando fallback local — solo válido en desarrollo');
+        const localResult = fallbackLocalLogin({ usuario, contrasena });
+        if (localResult.success) {
+          localResult.user = normalizeUser(localResult.user);
+          return { ...localResult, backendFallback: true };
+        }
+        return { success: false, error: localResult.error || 'Usuario o contraseña incorrectos' };
+      }
+      return { success: false, error: error.message || 'No se pudo iniciar sesión.' };
+    }
+  }
+
   try {
-    console.log('Intentando login con backend...');
-    const response = await apiRequest({
-      path: '/auth/login',
+    const response = await apiGateway({
+      resource: 'auth/login',
       method: 'POST',
-      body: { usuario, contrasena },
+      params: { usuario, contrasena },
     });
 
-    const { token, user: rawUser } = response;
-    if (!token || !rawUser) {
-      console.log('Respuesta del backend inválida');
+    const { token, user: rawUser, usuario: rawUsuario } = response;
+    const userRaw = rawUser || rawUsuario;
+    if (!token || !userRaw) {
       return { success: false, error: 'Respuesta inválida del servidor.' };
     }
 
-    const user = normalizeUser(rawUser);
-    console.log('Login exitoso con backend para usuario:', user.nombre);
+    const user = normalizeUser(userRaw);
     return { success: true, token, user };
   } catch (error) {
-    console.log('Error en login con backend:', error.message);
-    console.log('Usando fallback local...');
-    const localResult = fallbackLocalLogin({ usuario, contrasena });
-    if (localResult.success) {
-      localResult.user = normalizeUser(localResult.user);
-      console.log('Fallback local exitoso');
-      return localResult;
-    }
     if (shouldUseLocalFallback(error)) {
-      console.log('Usando fallback local por error de backend');
-      return localResult;
+      console.warn('[auth] usando fallback local — solo válido en desarrollo');
+      const localResult = fallbackLocalLogin({ usuario, contrasena });
+      if (localResult.success) {
+        localResult.user = normalizeUser(localResult.user);
+        return localResult;
+      }
+      return { success: false, error: localResult.error || 'Usuario o contraseña incorrectos' };
     }
-    console.log('Login fallido completamente');
     return { success: false, error: error.message || 'No se pudo iniciar sesión.' };
   }
 }
@@ -157,8 +178,7 @@ export async function mountAuth() {
       throw new Error('Elementos de autenticación no encontrados en el DOM');
     }
 
-    console.log('Elementos de autenticación encontrados correctamente');
-
+  
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       loginError.classList.add('d-none');
@@ -189,9 +209,7 @@ export async function mountAuth() {
 
       const { user, token } = result;
       const normalizedUser = normalizeUser(user);
-      console.log('Usuario autenticado:', normalizedUser);
-      console.log('Token:', token);
-      setSessionStorage(normalizedUser, token);
+              setSessionStorage(normalizedUser, token);
       await handleSuccessfulLogin(normalizedUser);
     });
 
@@ -286,8 +304,6 @@ function clearSessionStorage() {
 }
 
 async function handleSuccessfulLogin(user, isRestoring = false) {
-  console.log('Iniciando handleSuccessfulLogin para usuario:', user);
-  console.log('Rol del usuario:', user.rol);
   const userName = document.getElementById('user-name');
   const userRole = document.getElementById('user-role');
   const loginSection = document.getElementById('login-section');
@@ -299,20 +315,16 @@ async function handleSuccessfulLogin(user, isRestoring = false) {
   }
 
   authenticatedUser = normalizeUser(user);
-  console.log('Usuario normalizado:', authenticatedUser);
 
   try {
     if (isMedicoRole(user.rol)) {
-      console.log('Cargando módulo médico');
-      await mountMedicoModule(user);
+        await mountMedicoModule(user);
     } else if (isAdministrativeStaffRole(user.rol)) {
-      console.log('Cargando módulo administrativo');
-      await mountAdminModule(user);
+        await mountAdminModule(user);
       await mountPacientesModule();
       await mountAgendaModule();
     } else if (isSystemAdministratorRole(user.rol)) {
-      console.log('Cargando módulo administrador');
-      await mountAdministradorModule();
+        await mountAdministradorModule();
     } else {
       console.error('Rol no reconocido:', user.rol);
     }
@@ -327,7 +339,6 @@ async function handleSuccessfulLogin(user, isRestoring = false) {
   appSection.classList.add('active');
 
   navigateTo(getInitialSectionForRole(user.rol));
-  console.log('handleSuccessfulLogin completado');
 }
 
 function getInitialSectionForRole(role) {
@@ -336,17 +347,14 @@ function getInitialSectionForRole(role) {
 
 // ✅ CORRECCIÓN: función navigateTo declarada correctamente
 function navigateTo(sectionId) {
-  console.log('navigateTo llamado con sectionId:', sectionId);
 
   const appSection = document.getElementById('app-section');
   const loginSection = document.getElementById('login-section');
   if (appSection) {
     appSection.classList.add('active');
-    console.log('app-section mostrado');
   }
   if (loginSection) {
     loginSection.classList.remove('active');
-    console.log('login-section ocultado');
   }
 
   const contentSections = Array.from(document.querySelectorAll('.content-section')).filter(
@@ -354,13 +362,11 @@ function navigateTo(sectionId) {
   );
   contentSections.forEach(section => {
     section.classList.remove('active');
-    console.log('Ocultando:', section.id);
   });
 
   const targetSection = document.getElementById(sectionId + '-section') || document.getElementById(sectionId);
   if (targetSection) {
     targetSection.classList.add('active');
-    console.log('Mostrando:', targetSection.id);
   } else {
     console.warn('No se encontró la sección:', sectionId + '-section');
   }
@@ -370,7 +376,6 @@ function navigateTo(sectionId) {
     item.classList.toggle('active', item.getAttribute('data-section') === sectionId);
   });
 
-  console.log('Secciones activas después de navigateTo:', Array.from(document.querySelectorAll('.content-section.active')).map(s => s.id));
 }
 
 function updateDashboardForRole(role, nombre) {
@@ -435,16 +440,25 @@ function setupAdministradorDashboardActions() {
   }
 }
 
-function updateAdministradorDashboardCounts() {
+async function updateAdministradorDashboardCounts() {
   const activeUsersCount = document.getElementById('administrador-active-users-count');
   const inactiveUsersCount = document.getElementById('administrador-inactive-users-count');
-  const users = getLocalUsers();
 
-  const activeCount = users.filter((user) => user.status === 'Activo').length;
-  const inactiveCount = users.filter((user) => user.status === 'Inactivo').length;
-
-  if (activeUsersCount) activeUsersCount.textContent = String(activeCount);
-  if (inactiveUsersCount) inactiveUsersCount.textContent = String(inactiveCount);
+  try {
+    const users = await apiGateway({ resource: 'auth/usuarios', method: 'GET' }) ?? [];
+    const activeCount = users.filter((u) => u.status === 'Activo').length;
+    const inactiveCount = users.filter((u) => u.status === 'Inactivo').length;
+    if (activeUsersCount) activeUsersCount.textContent = String(activeCount);
+    if (inactiveUsersCount) inactiveUsersCount.textContent = String(inactiveCount);
+  } catch {
+    // Fallback al store local si el gateway falla (modo mock sin endpoint)
+    const { getLocalUsers } = await import('../administrador/administradorStore.js');
+    const users = getLocalUsers();
+    const activeCount = users.filter((u) => u.status === 'Activo').length;
+    const inactiveCount = users.filter((u) => u.status === 'Inactivo').length;
+    if (activeUsersCount) activeUsersCount.textContent = String(activeCount);
+    if (inactiveUsersCount) inactiveUsersCount.textContent = String(inactiveCount);
+  }
 }
 
 function updateNavByRole(role) {
