@@ -29,27 +29,27 @@ const CONTACT_TYPES = ['celular', 'fijo', 'email', 'whatsapp'];
 const api = {
   getPacientes: async (query) => {
     const response = await searchPacientes(query);
-    return response?.data || response || [];
+    return response || [];
   },
   getPaciente: async (id) => {
     const response = await getPaciente(id);
-    return response?.data || response || null;
+    return response || null;
   },
   crearPaciente: async (data) => {
     const response = await createPaciente(data);
-    return response?.data || response;
+    return response;
   },
   actualizarPaciente: async (id, data) => {
     const response = await updatePaciente(id, data);
-    return response?.data || response;
+    return response;
   },
   getEps: async () => {
     const response = await getEps();
-    return response?.data || response || [];
+    return response || [];
   },
   getRegimenes: async () => {
     const response = await getRegimenes();
-    return response?.data || response || [];
+    return response || [];
   },
 };
 

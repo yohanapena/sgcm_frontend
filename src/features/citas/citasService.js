@@ -112,7 +112,6 @@ export async function getEspecialidades() {
 
 export async function getEstados() {
   const response = await apiGateway({ resource: 'estados', method: 'GET' });
-  if (Array.isArray(response?.data)) return response.data;
   if (Array.isArray(response)) return response;
-  return ['Agendada', 'Atendida', 'Cancelada', 'No asistió'];
+  return ['Agendada', 'Atendida', 'Cancelada'];
 }

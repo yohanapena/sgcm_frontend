@@ -135,18 +135,24 @@ const store = {
       id_paciente_fk: 1,
       resumen: 'Paciente con antecedente de hipertensión. Toma medicamentos regularmente. Sin alergias conocidas.',
       fecha_apertura: '2025-01-15',
+      antecedentes_personales: 'Hipertensión arterial desde 2020. Toma losartán.',
+      antecedentes_familiares: 'Padre con diabetes tipo 2.',
     },
     {
       id_historia_clinica: 2,
       id_paciente_fk: 2,
       resumen: 'Paciente con antecedente de diabetes tipo 2. Realiza seguimiento trimestral. Alergia a penicilina.',
       fecha_apertura: '2025-02-10',
+      antecedentes_personales: null,
+      antecedentes_familiares: null,
     },
     {
       id_historia_clinica: 3,
       id_paciente_fk: 3,
       resumen: 'Paciente sano sin antecedentes de importancia. Primera consulta.',
       fecha_apertura: '2026-04-01',
+      antecedentes_personales: null,
+      antecedentes_familiares: null,
     },
   ],
   historial_citas: [],
@@ -158,10 +164,33 @@ const store = {
   servicios: SERVICIOS,
   horarios: HORARIOS,
   estados: [
-    { id: 1, nombre: 'Pendiente' },
+    { id: 1, nombre: 'Agendada' },
     { id: 2, nombre: 'Atendida' },
     { id: 3, nombre: 'Cancelada' },
-    { id: 4, nombre: 'No asistió' },
+  ],
+  usuarios: [
+    {
+      id_usuario: 1,
+      usuario: 'admin1',
+      rol: 'Administrativo',
+      nombre: 'María Pérez',
+      status: 'activo',
+    },
+    {
+      id_usuario: 2,
+      usuario: 'admin2',
+      rol: 'Administrador',
+      nombre: 'Andrés Gómez',
+      status: 'activo',
+    },
+    {
+      id_usuario: 3,
+      usuario: 'medico1',
+      rol: 'Médico',
+      nombre: 'Dr. Juan Díaz',
+      id_medico_fk: 2,
+      status: 'activo',
+    },
   ],
 };
 
@@ -282,6 +311,10 @@ function handleAuth(method, action, params) {
     };
   }
 
+  if (method === 'GET' && action === 'usuarios') {
+    return { data: store.usuarios };
+  }
+
   return { data: null };
 }
 
@@ -322,9 +355,10 @@ function handlePacientes(method, params, resourceId) {
     if (index === -1) {
       return { data: null };
     }
+    const { numero_identificacion, ...camposActualizables } = params || {};
     store.pacientes[index] = {
       ...store.pacientes[index],
-      ...params,
+      ...camposActualizables,
       sexo: params?.sexo ?? store.pacientes[index].sexo,
       tipo_sangre: params?.tipo_sangre ?? store.pacientes[index].tipo_sangre,
       alergias: params?.alergias ?? store.pacientes[index].alergias,
@@ -403,7 +437,9 @@ function handleCitas(method, params, resourceId, action) {
     };
     store.citas.push(nuevo);
     store.historial_citas.push({
-      id_historial: store.historial_citas.length + 1,
+      id_historial: store.historial_citas.length
+        ? Math.max(...store.historial_citas.map((hist) => hist.id_historial)) + 1
+        : 1,
       id_cita_fk: nuevo.id_cita,
       estado: 'Agendada',
       fecha: new Date().toISOString(),
@@ -452,7 +488,9 @@ function handleConsultas(method, params) {
 
   if (method === 'POST') {
     const nueva = {
-      id_consulta: store.consultas.length + 1,
+      id_consulta: store.consultas.length
+        ? Math.max(...store.consultas.map((consulta) => consulta.id_consulta)) + 1
+        : 1,
       ...params,
       fecha_consulta: new Date().toISOString().split('T')[0],
     };
@@ -462,7 +500,9 @@ function handleConsultas(method, params) {
       const cita = store.citas.find((c) => c.id_cita === params.id_cita_fk);
       if (cita && cita.estado !== 'Atendida') {
         store.historial_citas.push({
-          id_historial: store.historial_citas.length + 1,
+          id_historial: store.historial_citas.length
+            ? Math.max(...store.historial_citas.map((hist) => hist.id_historial)) + 1
+            : 1,
           id_cita_fk: params.id_cita_fk,
           estado_anterior: cita.estado,
           estado_nuevo: 'Atendida',
@@ -511,6 +551,8 @@ function handleHistoriasClinicas(method, params) {
       resumen: params?.resumen || '',
       fecha_apertura: params?.fecha_apertura || new Date().toISOString().split('T')[0],
       id_paciente_fk: params?.id_paciente_fk,
+      antecedentes_personales: params?.antecedentes_personales ?? null,
+      antecedentes_familiares: params?.antecedentes_familiares ?? null,
     };
 
     store.historias_clinicas.push(nuevo);

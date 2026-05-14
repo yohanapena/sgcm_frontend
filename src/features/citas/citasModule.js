@@ -12,13 +12,11 @@ let aplicarFiltrosBtn;
 let limpiarFiltrosBtn;
 let alertTimeoutId = null;
 let cancelCitaId = null;
-let atenderCitaId = null;
 
 const ESTADOS_FALLBACK = [
-  { id: 1, nombre: 'Pendiente' },
+  { id: 1, nombre: 'Agendada' },
   { id: 2, nombre: 'Atendida' },
   { id: 3, nombre: 'Cancelada' },
-  { id: 4, nombre: 'No asistió' },
 ];
 
 const api = {
@@ -84,7 +82,6 @@ async function registerAgendaManagement() {
   // Global functions for table actions
   window.modificarCita = modificarCita;
   window.cancelarCitaModal = cancelarCitaModal;
-  window.registrarCitaCompletada = registrarCitaCompletada;
 
   // Populate filter dropdowns
   await populateFilterOptions();
@@ -216,7 +213,7 @@ function renderAgendaTable(citas) {
         <td>${cita.observaciones || '-'}</td>
         <td>
           <div class="btn-group btn-group-sm" role="group">
-            ${cita.estado !== 'Cancelada' ? `
+            ${cita.estado === 'Agendada' ? `
               <button type="button" class="btn btn-outline-warning" onclick="modificarCita(${cita.id_cita})" title="Modificar">
                 <i class="fas fa-edit"></i>
               </button>
@@ -236,9 +233,9 @@ function renderAgendaTable(citas) {
 
 function getEstadoBadgeColor(estado) {
   const colors = {
-    Agendada: 'warning',
+    Agendada: 'primary',
     Atendida: 'success',
-    Cancelada: 'danger',
+    Cancelada: 'secondary',
   };
   return colors[estado] || 'secondary';
 }
@@ -288,7 +285,6 @@ function abrirModalModificarCita(cita) {
 
   // Clear any global modal state variables if they exist
   if (typeof cancelCitaId !== 'undefined') cancelCitaId = null;
-  if (typeof atenderCitaId !== 'undefined') atenderCitaId = null;
 
   // Populate modal with cita data
   if (modalContent) {
@@ -407,59 +403,6 @@ async function cancelarCitaModal(citaId) {
   if (bsModal.show) bsModal.show();
 }
 
-async function registrarCitaCompletada(citaId) {
-  const modal = document.getElementById('modal-atender-cita');
-  if (!modal) {
-    mostrarAlerta('warning', 'Modal de atención no disponible.');
-    return;
-  }
-
-  atenderCitaId = citaId;
-  const notaInput = modal.querySelector('#atender-cita-nota');
-  const notaError = modal.querySelector('#atender-cita-error');
-  if (notaInput) notaInput.value = '';
-  if (notaError) notaError.textContent = '';
-
-  const confirmButton = modal.querySelector('#confirm-atender-cita-btn');
-  if (confirmButton) {
-    confirmButton.onclick = async () => {
-      const nota = notaInput?.value?.trim() || '';
-      if (!nota) {
-        if (notaError) notaError.textContent = 'La observación es obligatoria.';
-        return;
-      }
-
-      try {
-        const servicioCheckboxes = Array.from(modal.querySelectorAll('.servicio-check:checked'));
-        const serviciosSeleccionados = servicioCheckboxes
-          .map((checkbox) => Number(checkbox.value))
-          .filter((id) => Number.isInteger(id) && id > 0);
-
-        if (serviciosSeleccionados.length === 0) {
-          if (notaError) notaError.textContent = 'Debes seleccionar al menos un servicio.';
-          return;
-        }
-
-        const datosHistorial = {
-          diagnostico: nota,
-          observacion: nota,
-          servicios_ids: serviciosSeleccionados,
-        };
-
-        await api.registrarHistorial(atenderCitaId, datosHistorial);
-        mostrarAlerta('success', 'Cita marcada como atendida.');
-        await cargarAgenda();
-        const bsModal = new (window.bootstrap?.Modal || function(){})(modal);
-        if (bsModal.hide) bsModal.hide();
-      } catch (error) {
-        mostrarAlerta('danger', 'Error al marcar cita como atendida: ' + error.message);
-      }
-    };
-  }
-
-  const bsModal = new (window.bootstrap?.Modal || function(){})(modal);
-  if (bsModal.show) bsModal.show();
-}
 
 function verDetallesCita(citaId) {
   // Show appointment details in an alert or modal

@@ -44,7 +44,8 @@ function normalizeUserRecord(user) {
 export async function fetchUsers(statusFilter = null) {
   try {
     const data = await apiFetch('/auth/usuarios');
-    return data
+    const users = Array.isArray(data) ? data : [];
+    return users
       .map(normalizeUserRecord)
       .filter((user) => {
         if (!statusFilter) return true;
@@ -52,7 +53,8 @@ export async function fetchUsers(statusFilter = null) {
       });
   } catch (error) {
     if (isBackendUnavailable(error)) {
-      return localUsers
+      const users = Array.isArray(localUsers) ? localUsers : [];
+      return users
         .map(normalizeUserRecord)
         .filter((user) => {
           if (!statusFilter) return true;
@@ -66,7 +68,8 @@ export async function fetchUsers(statusFilter = null) {
 export async function fetchMedicos() {
   try {
     const data = await apiFetch('/auth/medicos');
-    return data.map((medico) => ({
+    const medicos = Array.isArray(data) ? data : [];
+    return medicos.map((medico) => ({
       id_medico: medico.id_medico,
       nombre: medico.nombre,
       especialidad: medico.especialidad,

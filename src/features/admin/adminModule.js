@@ -177,7 +177,7 @@ function registerAppointmentWizard() {
     let especialidades = [];
     try {
       const response = await getEspecialidades();
-      especialidades = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
+      especialidades = Array.isArray(response) ? response : [];
     } catch (error) {
       console.error('Error cargando especialidades:', error);
       specialtyCardsContainer.innerHTML = '<div class="col-12 text-center text-danger py-3">Error al cargar especialidades.</div>';
@@ -227,7 +227,7 @@ function registerAppointmentWizard() {
     let medicos = [];
     try {
       const response = await getMedicos();
-      const todos = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
+      const todos = Array.isArray(response) ? response : [];
       // Filtrar por especialidad si el médico tiene el campo id_especialidad_fk o especialidades[]
       medicos = todos.filter((m) => {
         if (Array.isArray(m.especialidades)) return m.especialidades.includes(especialidadId);
@@ -286,7 +286,7 @@ function registerAppointmentWizard() {
     try {
       const medicoId = citaWizard.medico?.id_medico;
       const response = await apiGateway({ resource: 'horarios', method: 'GET', params: medicoId ? { medico_id: medicoId } : {} });
-      horariosArray = Array.isArray(response?.data) ? response.data : [];
+      horariosArray = Array.isArray(response) ? response : [];
     } catch (error) {
       console.error('Error cargando horarios:', error);
       scheduleContainer.innerHTML = '<div class="text-center text-danger py-3">Error al cargar horarios.</div>';
@@ -422,7 +422,7 @@ function registerAppointmentWizard() {
     }
     try {
       const response = await searchPacientes(query);
-      const pacientes = response?.data || [];
+      const pacientes = Array.isArray(response) ? response : [];
       renderPatientResults(pacientes);
     } catch (error) {
       console.error('Error buscando pacientes:', error);
@@ -548,7 +548,7 @@ function registerAppointmentWizard() {
 
     try {
       const response = await createCita(payload);
-      if (response?.data) {
+      if (response?.id_cita) {
         showWizardAlert('success', `✓ Cita agendada exitosamente para ${citaWizard.paciente.nombre} ${citaWizard.paciente.primer_apellido}`);
         resetWizard();
       } else {
@@ -606,7 +606,7 @@ function registerAppointmentFilters() {
 
     try {
       const response = await apiGateway({ resource: 'citas', method: 'GET' });
-      let citas = response?.data || [];
+      let citas = Array.isArray(response) ? response : [];
 
       if (fechaInicio) citas = citas.filter((c) => c.fecha >= fechaInicio);
       if (fechaFin) citas = citas.filter((c) => c.fecha <= fechaFin);

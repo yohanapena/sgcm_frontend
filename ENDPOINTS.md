@@ -1,42 +1,22 @@
-# Endpoints REST (compatibles con frontend/mock)
+# Contratos API — SGCM v2 (corregidos y definitivos)
 
-Sistema: **gestor de citas médicas**.
-
-> Nota de compatibilidad: los endpoints listados primero están diseñados para ser **1:1** con el contrato observado en `src/api/mockApi.js` y llamadas del frontend (vía `apiGateway`).
-
-## Convenciones de respuesta
-
-- Cuando el mock usa `apiRequest`, el frontend espera típicamente **JSON con forma** `response.data`.
-- Para backend real, mantén respuestas consistentes:
-  - Puede devolverse `{ data: ... }`.
-  - En el frontend se desenvuelve `data?.data` si existe.
-
-Ejemplo esperado (general):
-```json
-{ "data": { } }
-```
-
-Para listados:
-```json
-{ "data": [ ... ] }
-```
+> Documento generado tras auditoría del DDL v3 + ENDPOINTS.md original.
+> Este es el contrato único de verdad. Reemplaza el ENDPOINTS.md anterior.
+> 
+> **Convención de respuesta:** toda respuesta exitosa tiene la forma `{ "data": ... }`.  
+> **Autenticación:** todos los endpoints excepto `/auth/login` requieren `Authorization: Bearer {token}`.  
+> **Snake_case:** todos los campos siguen el naming del DDL exactamente.
 
 ---
 
-## 1) Autenticación y usuarios (módulo auth)
+## 1. Auth — Andrea
 
-### 1.1 Login
-- **POST** `/auth/login`
-- **Propósito:** iniciar sesión.
-- **Request body esperado:**
+### POST `/auth/login`
 ```json
-{
-  "usuario": "string",
-  "contrasena": "string"
-}
-```
-- **Response JSON esperado:**
-```json
+// Request
+{ "usuario": "string", "contrasena": "string" }
+
+// Response 200
 {
   "data": {
     "token": "string",
@@ -44,197 +24,186 @@ Para listados:
       "id_usuario": 1,
       "usuario": "admin",
       "rol": "Administrativo",
-      "nombre": "string",
-      "id_medico_fk": 2
+      "estado": "Activo",
+      "id_medico_fk": null
     }
   }
 }
 ```
 
-### 1.2 Perfil del usuario autenticado
-- **GET** `/auth/me`
-- **Propósito:** obtener información del usuario autenticado.
-- **Request body:** ninguno
-- **Response JSON esperado:**
+### GET `/auth/me`
 ```json
+// Response 200
 {
   "data": {
     "id_usuario": 1,
     "usuario": "admin",
-    "rol": "Administrativo"
+    "rol": "Administrativo",
+    "estado": "Activo",
+    "id_medico_fk": null
   }
 }
 ```
 
-### 1.3 Listado de usuarios (dashboards admins)
-- **GET** `/auth/usuarios`
-- **Propósito:** listar usuarios del sistema (para conteos por estado y administración).
-- **Request body:** ninguno
-- **Response JSON esperado:**
+---
+
+## 2. Usuarios — Andrea
+> ⚠️ Cambiado: rutas movidas de /auth/usuarios → /usuarios (módulo separado)
+
+### GET `/usuarios`
 ```json
+// Response 200
 {
   "data": [
     {
       "id_usuario": 1,
       "usuario": "string",
-      "rol": "Médico | Administrativo | Administrador",
-      "nombre": "string",
-      "status": "Activo | Inactivo",
-      "id_medico_fk": 2
+      "rol": "Administrativo",
+      "estado": "Activo",
+      "fecha_creacion": "2026-01-01T00:00:00",
+      "id_medico_fk": null,
+      "medico_nombre": "string"
     }
   ]
 }
 ```
+> `medico_nombre` viene de JOIN con medicos (nombre + primer_apellido). NULL si rol=Administrativo.
 
-### 1.4 Obtener usuario por id
-- **GET** `/auth/usuarios/{id_usuario}`
-- **Propósito:** obtener usuario específico.
-- **Response JSON esperado:**
+### GET `/usuarios/{id_usuario}`
 ```json
-{ "data": { "id_usuario": 1, "status": "Activo", "rol": "string" } }
-```
-
-### 1.5 Crear usuario
-- **POST** `/auth/usuarios`
-- **Propósito:** crear usuario (admin/administrativo/médico).
-- **Request body esperado:**
-```json
+// Response 200
 {
-  "id_usuario": null,
-  "usuario": "string",
-  "contrasena": "string",
-  "rol": "Médico | Administrativo | Administrador",
-  "status": "Activo | Inactivo",
-  "nombre": "string",
-  "id_medico_fk": 2
-}
-```
-- **Response JSON esperado:**
-```json
-{ "data": { "id_usuario": 1, "rol": "string" } }
-```
-
-### 1.6 Actualizar usuario
-- **PUT** `/auth/usuarios/{id_usuario}`
-- **Propósito:** actualizar usuario.
-- **Request body esperado:** (parcial o completo según backend)
-```json
-{
-  "usuario": "string",
-  "contrasena": "string",
-  "rol": "...",
-  "status": "Activo | Inactivo",
-  "nombre": "string",
-  "id_medico_fk": 2
-}
-```
-- **Response JSON esperado:**
-```json
-{ "data": { "id_usuario": 1, "status": "Activo" } }
-```
-
-### 1.7 Cambiar estado (PATCH - acorde a frontend)
-- **PATCH** `/auth/usuarios/{id_usuario}/estado`
-- **Propósito:** activar/inactivar usuario.
-- **Request body esperado:**
-```json
-{ "estado": "Activo | Inactivo" }
-```
-- **Response JSON esperado:**
-```json
-{ "data": { "id_usuario": 1, "status": "Inactivo" } }
-```
-
----
-
-## 2) Catálogos (catálogos / opciones)
-
-### 2.1 EPS
-- **GET** `/eps`
-- **Propósito:** listar EPS.
-- **Response JSON esperado:**
-```json
-{ "data": [ { "id_eps": 1, "nombre": "Sura" } ] }
-```
-
-### 2.2 Regímenes
-- **GET** `/regimenes`
-- **Propósito:** listar regímenes.
-- **Response:**
-```json
-{ "data": [ { "id_regimen": 1, "nombre": "Contributivo" } ] }
-```
-
-### 2.3 Especialidades
-- **GET** `/especialidades`
-- **Propósito:** listar especialidades.
-- **Response:**
-```json
-{ "data": [ { "id_especialidad": 1, "nombre": "Cardiología" } ] }
-```
-
-### 2.4 Servicios
-- **GET** `/servicios`
-- **Propósito:** listar servicios.
-- **Response:**
-```json
-{ "data": [ { "id_servicio": 1, "nombre": "Laboratorio" } ] }
-```
-
-### 2.5 Horarios (por médico si aplica)
-- **GET** `/horarios`
-- **Propósito:** listar horarios.
-- **Filtros (query):**
-  - `medico_id` (opcional)
-- **Response JSON esperado:**
-```json
-{ "data": [ { "id_horario": 1, "id_medico_fk": 2, "dia": "Lunes" } ] }
-```
-
-### 2.6 Estados de cita
-- **GET** `/estados`
-- **Propósito:** listar estados posibles.
-- **Response:**
-```json
-{ "data": [ { "id": 1, "nombre": "Pendiente" } ] }
-```
-
----
-
-## 3) Pacientes (módulo pacientes)
-
-### 3.1 Listar / buscar pacientes
-- **GET** `/pacientes`
-- **Propósito:** listar pacientes o buscar por query.
-- **Query params esperados (observado en frontend/mock):**
-  - `query` (string; por número de identificación o nombre completo)
-- **Response JSON esperado:**
-```json
-{ "data": [
-  {
-    "id_paciente": 1,
-    "numero_identificacion": "1020304050",
-    "nombre": "María",
-    "primer_apellido": "González",
-    "segundo_apellido": "López",
-    "fecha_de_nacimiento": "1985-03-15",
-    "direccion": "string",
-    "id_eps_fk": 1,
-    "id_regimen_fk": 1,
-    "sexo": "F | M",
-    "tipo_sangre": "O+",
-    "alergias": ["string"],
-    "antecedentes": "string",
-    "contactos": [ { "tipo": "celular|email", "dato_contacto": "string" } ]
+  "data": {
+    "id_usuario": 1,
+    "usuario": "string",
+    "rol": "Administrativo",
+    "estado": "Activo",
+    "fecha_creacion": "2026-01-01T00:00:00",
+    "id_medico_fk": null,
+    "medico_nombre": null
   }
-]}
+}
 ```
 
-### 3.2 Crear paciente
-- **POST** `/pacientes`
-- **Propósito:** crear paciente.
-- **Request body esperado:**
+### POST `/usuarios`
 ```json
+// Request
+{
+  "usuario": "string",
+  "contrasena": "string",
+  "rol": "Administrativo | Medico",
+  "id_medico_fk": null
+}
+// ⚠️ rol solo puede ser 'Administrativo' o 'Medico' (ENUM del DDL)
+// ⚠️ si rol=Medico, id_medico_fk es obligatorio
+
+// Response 201
+{ "data": { "id_usuario": 1, "usuario": "string", "rol": "Medico", "estado": "Activo" } }
+```
+
+### PUT `/usuarios/{id_usuario}`
+```json
+// Request (campos opcionales, enviar solo los que cambian)
+{
+  "usuario": "string",
+  "contrasena": "string",
+  "rol": "Administrativo | Medico",
+  "id_medico_fk": null
+}
+
+// Response 200
+{ "data": { "id_usuario": 1, "estado": "Activo" } }
+```
+
+### PATCH `/usuarios/{id_usuario}/estado`
+```json
+// Request
+{ "estado": "Activo | Inactivo" }
+
+// Response 200
+{ "data": { "id_usuario": 1, "estado": "Inactivo" } }
+```
+
+---
+
+## 3. Catálogos — Vanesa
+> Solo lectura. No hay POST/PUT/DELETE en catálogos.
+
+### GET `/eps`
+```json
+// Response 200
+{ "data": [ { "id_eps": 1, "nit_eps": "900123456", "nombre_eps": "Sura" } ] }
+```
+
+### GET `/regimenes`
+```json
+// Response 200
+{ "data": [ { "id_regimen": 1, "tipo_regimen": "Contributivo" } ] }
+```
+
+### GET `/especialidades`
+```json
+// Response 200
+{ "data": [ { "id_especialidad": 1, "nombre_especialidad": "Medicina General", "descripcion": "string" } ] }
+```
+> ⚠️ Campo es `nombre_especialidad`, no `nombre`. Ajustar frontend.
+
+### GET `/servicios`
+```json
+// Response 200
+{ "data": [ { "id_servicio": 1, "nombre": "Laboratorio", "descripcion": "string" } ] }
+```
+
+> ⚠️ ELIMINADO: `GET /estados` — los estados son ENUM hardcodeado en el frontend:
+> `['Agendada', 'Cancelada', 'Atendida']`
+
+---
+
+## 4. Pacientes — Vanesa
+
+### GET `/pacientes?query={string}`
+```json
+// Response 200
+{
+  "data": [
+    {
+      "id_paciente": 1,
+      "numero_identificacion": "1020304050",
+      "nombre": "María",
+      "primer_apellido": "González",
+      "segundo_apellido": "López",
+      "fecha_de_nacimiento": "1985-03-15",
+      "direccion": "string",
+      "id_eps_fk": 1,
+      "nombre_eps": "Sura",
+      "id_regimen_fk": 1,
+      "tipo_regimen": "Contributivo",
+      "sexo": "F",
+      "tipo_sangre": "O+",
+      "contactos": [
+        { "id_contacto": 1, "tipo": "celular", "dato_contacto": "3001234567" }
+      ],
+      "alergias": [
+        { "id": 1, "alergia": "Penicilina" }
+      ]
+    }
+  ]
+}
+```
+> `nombre_eps` y `tipo_regimen` vienen de JOIN — evita N+1 en el frontend.  
+> `alergias` se incluye en el GET como JOIN con `paciente_alergias` para lectura.  
+> ⚠️ `antecedentes` NO va aquí — está en historia clínica.
+
+### GET `/pacientes/{id_paciente}`
+```json
+// Response 200 — misma estructura que el objeto del listado
+// Response 404
+{ "detail": "Paciente no encontrado" }
+```
+
+### POST `/pacientes`
+```json
+// Request
 {
   "numero_identificacion": "string",
   "nombre": "string",
@@ -244,294 +213,403 @@ Para listados:
   "direccion": "string",
   "id_eps_fk": 1,
   "id_regimen_fk": 1,
-  "sexo": "F | M",
-  "tipo_sangre": "string",
-  "alergias": ["string"],
-  "antecedentes": "string",
-  "contactos": [ { "tipo": "string", "dato_contacto": "string" } ]
+  "sexo": "F | M | null",
+  "tipo_sangre": "O+ | null",
+  "contactos": [
+    { "tipo": "celular | fijo | email | whatsapp", "dato_contacto": "string" }
+  ]
+}
+// ⚠️ alergias NO van aquí — tienen endpoints propios
+// ⚠️ antecedentes NO van aquí — van en historia clínica
+
+// Response 201
+{ "data": { "id_paciente": 1, "numero_identificacion": "string" } }
+// Response 409
+{ "detail": "El número de identificación ya existe en el sistema" }
+```
+
+### PUT `/pacientes/{id_paciente}`
+```json
+// Request — mismo body que POST excepto numero_identificacion (no se puede cambiar)
+// Response 200
+{ "data": { "id_paciente": 1, "nombre": "string" } }
+```
+
+### GET `/pacientes/{id_paciente}/alergias`
+```json
+// Response 200
+{ "data": [ { "id": 1, "alergia": "Penicilina" } ] }
+```
+
+### POST `/pacientes/{id_paciente}/alergias`
+```json
+// Request
+{ "alergia": "string" }
+
+// Response 201
+{ "data": { "id": 1, "id_paciente_fk": 1, "alergia": "Penicilina" } }
+```
+
+### DELETE `/pacientes/{id_paciente}/alergias/{id_alergia}`
+```json
+// Response 200
+{ "data": { "deleted": true } }
+// Response 404
+{ "detail": "Alergia no encontrada" }
+```
+
+---
+
+## 5. Médicos — Yefferson
+
+### GET `/medicos?query={string}`
+```json
+// Response 200
+{
+  "data": [
+    {
+      "id_medico": 1,
+      "nombre": "string",
+      "primer_apellido": "string",
+      "segundo_apellido": "string",
+      "tarjeta_profesional": "string",
+      "estado": "Activo",
+      "especialidades": [
+        { "id_especialidad": 1, "nombre_especialidad": "Medicina General" }
+      ]
+    }
+  ]
 }
 ```
-- **Response:** `{ "data": <paciente_creado> }`
+> ⚠️ Cambiado: `especialidades` es array de objetos via JOIN con `especialidades_medicos`.
+> Ya no es `"especialidad": "string"`.
 
-### 3.3 Obtener paciente por id
-- **GET** `/pacientes/{id_paciente}`
-- **Propósito:** obtener paciente.
-- **Response:** `{"data": <paciente|null>}`
+### POST `/medicos`
+```json
+// Request
+{
+  "nombre": "string",
+  "primer_apellido": "string",
+  "segundo_apellido": "string",
+  "tarjeta_profesional": "string",
+  "especialidades": [1, 2]
+}
+// ⚠️ Cambiado: especialidades es array de IDs, no string
+// El repository hace INSERT en especialidades_medicos por cada id
 
-### 3.4 Actualizar paciente
-- **PUT** `/pacientes/{id_paciente}`
-- **Propósito:** actualizar paciente.
-- **Request body esperado:** estructura similar a creación.
-- **Response:** `{"data": <paciente_actualizado|null>}`
+// Response 201
+{ "data": { "id_medico": 1, "nombre": "string" } }
+```
+
+### PUT `/medicos/{id_medico}`
+```json
+// Request — mismo body que POST
+// Response 200
+{ "data": { "id_medico": 1, "estado": "Activo" } }
+```
+
+### PATCH `/medicos/{id_medico}/estado`
+```json
+// Request
+{ "estado": "Activo | Inactivo" }
+// Response 200
+{ "data": { "id_medico": 1, "estado": "Inactivo" } }
+```
+
+### GET `/medicos/{id_medico}/horarios`
+```json
+// Response 200
+{
+  "data": [
+    {
+      "id_horario_medico": 1,
+      "dia_semana": "Lunes",
+      "hora_inicial": "08:00",
+      "hora_final": "12:00",
+      "fecha_vigencia_inicio": "2026-01-01",
+      "fecha_vigencia_fin": null
+    }
+  ]
+}
+```
+
+### POST `/medicos/{id_medico}/horarios`
+```json
+// Request
+{
+  "dia_semana": "Lunes | Martes | Miércoles | Jueves | Viernes | Sábado",
+  "hora_inicial": "08:00",
+  "hora_final": "12:00",
+  "fecha_vigencia_inicio": "YYYY-MM-DD",
+  "fecha_vigencia_fin": "YYYY-MM-DD | null"
+}
+// Response 201
+{ "data": { "id_horario_medico": 1 } }
+// Response 409
+{ "detail": "El médico ya tiene un horario superpuesto en ese día" }
+```
 
 ---
 
-## 4) Médicos (módulo medico)
+## 6. Citas — Yefferson
 
-### 4.1 Listar / buscar médicos
-- **GET** `/medicos`
-- **Propósito:** listar médicos o buscar por `query`.
-- **Query params:**
-  - `query` (string)
-- **Response JSON esperado:**
+### GET `/citas`
 ```json
-{ "data": [
-  {
-    "id_medico": 2,
-    "nombre": "string",
-    "especialidad": "string",
-    "primer_apellido": "...",
-    "segundo_apellido": "..."
-  }
-]}
+// Query params opcionales: medico_id, paciente_id, estado, fecha_desde, fecha_hasta
+// Response 200
+{
+  "data": [
+    {
+      "id_cita": 1,
+      "fecha": "YYYY-MM-DD",
+      "hora": "HH:MM",
+      "estado": "Agendada | Cancelada | Atendida",
+      "observacion": "string",
+      "fecha_creacion": "ISO-8601",
+      "id_paciente_fk": 1,
+      "paciente_nombre": "María González",
+      "id_horario_medico_fk": 1,
+      "medico_nombre": "Dr. Juan Pérez",
+      "especialidad_nombre": "Medicina General"
+    }
+  ]
+}
+```
+> `paciente_nombre`, `medico_nombre`, `especialidad_nombre` vienen de JOINs.
+> ⚠️ No hay `id_medico_fk` directo — el médico viene via `horarios_medicos`.
+
+### GET `/citas/{id_cita}`
+```json
+// Response 200 — mismo objeto del listado
+// Response 404
+{ "detail": "Cita no encontrada" }
 ```
 
-### 4.2 Crear médico
-- **POST** `/medicos`
-- **Propósito:** crear médico.
-- **Request body esperado (mock):**
+### POST `/citas`
 ```json
-{ "nombre": "string", "especialidad": "string", "id_especialidad_fk": 1 }
-```
-- **Response:** `{"data": <medico_creado>}`
-
-### 4.3 Actualizar médico
-- **PUT** `/medicos/{id_medico}`
-- **Propósito:** actualizar médico.
-- **Request body:** similar a creación.
-- **Response:** `{"data": <medico_actualizado|null>}`
-
----
-
-## 5) Citas (módulo citas/agenda)
-
-### 5.1 Listar citas (con filtros vía query)
-- **GET** `/citas`
-- **Propósito:** listar citas (para agenda, panel médico y administrativo).
-- **Query params (observado mock):**
-  - `medicoId` (number)
-  - `pacienteId` (number)
-  - `estado` (string; “Todas” o vacío significa sin filtro)
-  - (Recomendado) `desde`, `hasta` para rango de fechas
-- **Response JSON esperado:**
-```json
-{ "data": [
-  {
-    "id_cita": 1,
-    "fecha": "YYYY-MM-DD",
-    "hora": "HH:mm",
-    "estado": "Agendada|Atendida|Cancelada|No asistió",
-    "id_paciente_fk": 1,
-    "id_medico_fk": 2,
-    "id_horario_medico_fk": 1,
-    "observacion": "string"
-  }
-]}
-```
-
-> Compatibilidad: el frontend también normaliza nombres como `fecha_cita`, `hora_cita`, `observaciones/observacion` según su UI. Backend puede devolver el formato mock y el frontend lo normaliza.
-
-### 5.2 Crear cita
-- **POST** `/citas`
-- **Propósito:** agendar una cita.
-- **Request body esperado:**
-```json
+// Request
 {
   "fecha": "YYYY-MM-DD",
-  "hora": "HH:mm",
+  "hora": "HH:MM",
   "id_paciente_fk": 1,
-  "id_medico_fk": 2,
   "id_horario_medico_fk": 1,
+  "observacion": "string | null"
+}
+// ⚠️ NO incluir id_medico_fk — el médico se infiere del horario
+// ⚠️ estados posibles: 'Agendada','Cancelada','Atendida' (no 'No asistió')
+
+// Response 201
+{ "data": { "id_cita": 1, "estado": "Agendada" } }
+// Response 409
+{ "detail": "El horario ya está ocupado en esa fecha y hora" }
+```
+
+### PUT `/citas/{id_cita}`
+```json
+// Request (campos opcionales)
+{
+  "fecha": "YYYY-MM-DD",
+  "hora": "HH:MM",
   "observacion": "string"
 }
+// ⚠️ El estado NO se cambia por este endpoint — usar /cancelar o /consultas
+
+// Response 200
+{ "data": { "id_cita": 1 } }
 ```
-- **Response:** `{"data": <cita_creada>}`
 
-### 5.3 Obtener cita por id
-- **GET** `/citas/{id_cita}`
-- **Propósito:** obtener cita.
-- **Response:** `{"data": <cita|null>}`
-
-### 5.4 Actualizar cita
-- **PUT** `/citas/{id_cita}`
-- **Propósito:** actualizar cita (estado, observación, etc.).
-- **Request body esperado:**
+### PUT `/citas/{id_cita}/cancelar`
 ```json
+// Request
+{ "motivo": "string" }
+// El backend: cambia estado → 'Cancelada' e inserta en historial_citas
+
+// Response 200
+{ "data": { "id_cita": 1, "estado": "Cancelada" } }
+// Response 400
+{ "detail": "Solo se pueden cancelar citas en estado Agendada" }
+```
+
+### GET `/citas/{id_cita}/historial`
+```json
+// Response 200
 {
-  "estado": "Agendada|Atendida|Cancelada|No asistió",
-  "observacion": "string",
-  "fecha": "YYYY-MM-DD",
-  "hora": "HH:mm"
+  "data": [
+    {
+      "id_historial": 1,
+      "estado_anterior": "Agendada",
+      "estado_nuevo": "Cancelada",
+      "fecha_cambio": "ISO-8601",
+      "motivo": "string"
+    }
+  ]
 }
 ```
-- **Response:** `{"data": <cita_actualizada|null>}`
-
-### 5.5 Cancelar cita (operación de estado)
-- **PUT** `/citas/{id_cita}/cancelar`
-- **Propósito:** cancelar cita.
-- **Request body esperado:**
-```json
-{ "motivo": "string" }
-```
-- **Response:** `{"data": <cita_cancelada>}`
 
 ---
 
-## 6) Consultas (módulo consultas/historia clínica)
+## 7. Consultas — Yefferson
 
-### 6.1 Listar consultas (por historia clínica)
-- **GET** `/consultas`
-- **Propósito:** listar consultas filtradas.
-- **Query params (mock):**
-  - `id_historia_clinica_fk` (number)
-- **Response:**
+### GET `/consultas?id_historia_clinica_fk={id}`
 ```json
-{ "data": [
-  {
-    "id_consulta": 1,
-    "id_cita_fk": 1,
-    "id_historia_clinica_fk": 1,
-    "diagnostico": "string",
-    "observacion": "string",
-    "fecha_consulta": "YYYY-MM-DD",
-    "servicios_ids": [1,2]
-  }
-]}
+// Response 200
+{
+  "data": [
+    {
+      "id_consulta": 1,
+      "id_cita_fk": 1,
+      "id_historia_clinica_fk": 1,
+      "diagnostico": "string",
+      "observacion": "string",
+      "fecha": "YYYY-MM-DD",
+      "servicios": [
+        { "id_servicio": 1, "nombre": "Laboratorio" }
+      ]
+    }
+  ]
+}
 ```
+> ⚠️ Cambiado: `fecha` viene de JOIN con `citas.fecha` — no es campo propio de consultas.
+> `servicios` viene de JOIN con `consultas_servicios` → `servicios`.
 
-### 6.2 Crear consulta (desde una cita)
-- **POST** `/consultas`
-- **Propósito:** registrar una consulta asociada a una historia clínica y (opcionalmente) a una cita.
-- **Request body esperado:**
+### POST `/consultas`
 ```json
+// Request
 {
   "id_cita_fk": 1,
   "id_historia_clinica_fk": 1,
   "diagnostico": "string",
   "observacion": "string",
-  "servicios_ids": [1,5]
+  "servicios_ids": [1, 2]
 }
-```
-- **Response:** `{"data": <consulta_creada>}`
+// El backend automáticamente:
+// 1. Inserta en consultas
+// 2. Inserta en consultas_servicios por cada servicio_id
+// 3. Cambia cita.estado → 'Atendida' e inserta en historial_citas
 
-> Compatibilidad: el mock además cambia el estado de la cita a “Atendida” cuando `id_cita_fk` existe.
+// Response 201
+{ "data": { "id_consulta": 1 } }
+```
 
 ---
 
-## 7) Historial clínico (Historias clínicas)
+## 8. Historias Clínicas — Vanesa
 
-### 7.1 Obtener historias clínicas
-- **GET** `/historias_clinicas`
-- **Propósito:** listar historias clínicas.
-- **Query params (mock):**
-  - `pacienteId` (number) 
-  - `id_paciente_fk` (number)
-- **Response:**
+### GET `/historias_clinicas?paciente_id={id}`
 ```json
-{ "data": [
-  {
-    "id_historia_clinica": 1,
-    "id_paciente_fk": 1,
-    "resumen": "string",
-    "fecha_apertura": "YYYY-MM-DD"
-  }
-]}
+// Response 200
+{
+  "data": [
+    {
+      "id_historia_clinica": 1,
+      "id_paciente_fk": 1,
+      "resumen": "string",
+      "fecha_apertura": "YYYY-MM-DD",
+      "antecedentes_personales": "string | null",
+      "antecedentes_familiares": "string | null"
+    }
+  ]
+}
 ```
 
-### 7.2 Crear historia clínica
-- **POST** `/historias_clinicas`
-- **Propósito:** crear historia clínica (append inicial).
-- **Request body esperado:**
+### POST `/historias_clinicas`
 ```json
+// Request
 {
   "id_paciente_fk": 1,
-  "resumen": "string",
-  "fecha_apertura": "YYYY-MM-DD"
+  "resumen": "string | null",
+  "fecha_apertura": "YYYY-MM-DD",
+  "antecedentes_personales": "string | null",
+  "antecedentes_familiares": "string | null"
 }
+
+// Response 201
+{ "data": { "id_historia_clinica": 1 } }
+// Response 409
+{ "detail": "El paciente ya tiene una historia clínica" }
 ```
-- **Response:** `{"data": <historia_creada>}`
+
+### PUT `/historias_clinicas/{id_historia_clinica}`
+```json
+// Request
+{
+  "resumen": "string",
+  "antecedentes_personales": "string",
+  "antecedentes_familiares": "string"
+}
+
+// Response 200
+{ "data": { "id_historia_clinica": 1 } }
+```
 
 ---
 
-## 8) Signos vitales
+## 9. Signos Vitales — Vanesa
 
-### 8.1 Registrar signos vitales (por consulta)
-- **POST** `/signos_vitales`
-- **Propósito:** crear registro de signos vitales para una consulta.
-- **Request body esperado:**
+### POST `/signos_vitales`
 ```json
+// Request
 {
+  "id_historia_clinica_fk": 1,
   "id_consulta_fk": 1,
   "peso": 70.5,
-  "estatura": 175,
+  "estatura": 1.75,
   "temperatura": 36.6,
   "presion_arterial": "120/80",
   "frecuencia_cardiaca": 80,
-  "saturacion_oxigeno": 98,
-  "fecha_registro": "ISO-8601"
+  "saturacion_oxigeno": 98
+}
+// id_consulta_fk es opcional — se puede registrar sin consulta
+
+// Response 201
+{ "data": { "id_signo": 1, "fecha_registro": "ISO-8601" } }
+```
+
+### GET `/signos_vitales?id_consulta_fk={id}`
+```json
+// Response 200
+{
+  "data": [
+    {
+      "id_signo": 1,
+      "id_consulta_fk": 1,
+      "id_historia_clinica_fk": 1,
+      "peso": 70.5,
+      "estatura": 1.75,
+      "temperatura": 36.6,
+      "presion_arterial": "120/80",
+      "frecuencia_cardiaca": 80,
+      "saturacion_oxigeno": 98,
+      "fecha_registro": "ISO-8601"
+    }
+  ]
 }
 ```
-- **Response:** `{"data": <signos_vitales_creados>}`
 
-### 8.2 Listar signos vitales por consulta
-- **GET** `/signos_vitales`
-- **Propósito:** obtener signos vitales.
-- **Query params (mock):**
-  - `id_consulta_fk` (number)
-- **Response:**
+### GET `/signos_vitales?id_historia_clinica_fk={id}`
 ```json
-{ "data": [ { "id_signos_vitales": 1, "id_consulta_fk": 1, "peso": 70.5 } ] }
+// Response 200 — misma estructura, filtra por historia clínica
+// Retorna todos los registros ordenados por fecha_registro DESC
 ```
 
 ---
 
-## 9) Endpoints REST recomendados (dashboards, filtros, relaciones)
+## Resumen de cambios respecto al ENDPOINTS.md original
 
-Estos NO aparecen en el mock como endpoints dedicados, pero son REST “buenos” y te ayudan a backend real.
-
-### 9.1 Dashboard administrativo: usuarios por estado
-- **GET** `/dashboard/admin/users/count?estado=Activo|Inactivo`
-- **Propósito:** conteo por estado.
-- **Response:**
-```json
-{ "data": { "estado": "Activo", "count": 12 } }
-```
-
-> Para compatibilidad, el frontend actualmente usa `GET /auth/usuarios` y calcula el conteo en cliente. Puedes implementar este endpoint y (si luego modificas frontend) consumirlo.
-
-### 9.2 Dashboard administrativo: resumen general
-- **GET** `/dashboard/admin/summary`
-- **Response:**
-```json
-{ "data": {
-  "usuarios": { "Activo": 10, "Inactivo": 3 },
-  "pacientes_count": 50,
-  "citas_hoy_count": 14
-}}
-```
-
-### 9.3 Dashboard médico: citas del día
-- **GET** `/dashboard/medico/{id_medico}/citas?fecha=YYYY-MM-DD`
-- **Response:**
-```json
-{ "data": [ { "id_cita": 1, "hora": "09:00", "estado": "Agendada" } ] }
-```
-
-> En el frontend actual el médico filtra desde `GET /citas`.
-
-### 9.4 Relaciones “expand” (p.ej. citas con paciente y médico)
-- **GET** `/citas?expand=paciente,medico&estado=Agendada`
-- **Propósito:** evitar N+1 desde backend.
-- **Response:**
-```json
-{ "data": [ { "id_cita": 1, "paciente": {"id_paciente":1}, "medico": {"id_medico":2} } ] }
-```
-
----
-
-## 10) Notas de diseño REST (para backend real)
-
-- Operaciones de estado (ej. cancelar) deben ser rutas claras o usar PATCH con comando. Aquí se preserva compatibilidad con el mock: `/citas/{id}/cancelar`.
-- Para filtros, usa `query params` en endpoints listados (`/citas`, `/pacientes`, `/historias_clinicas`, `/consultas`).
-- Mantén campos del mock (snake_case como `id_paciente_fk`, `observacion`) para máxima compatibilidad; el frontend hace normalización en algunos módulos.
-
+| # | Cambio | Afecta |
+|---|--------|--------|
+| 1 | `/auth/usuarios` → `/usuarios` | Andrea |
+| 2 | Campo `nombre` en usuarios → `medico_nombre` via JOIN | Andrea |
+| 3 | Campo `status` → `estado` en toda la API | Todos |
+| 4 | `GET /estados` eliminado — ENUM hardcodeado | Frontend |
+| 5 | `alergias` → endpoints propios `/pacientes/{id}/alergias` | Vanesa |
+| 6 | `antecedentes` removido de POST /pacientes → va en historia clínica | Vanesa |
+| 7 | Catálogos: `nombre` → nombres exactos del DDL (`nombre_eps`, `tipo_regimen`, etc.) | Vanesa |
+| 8 | POST /medicos: `especialidad: string` → `especialidades: [ids]` | Yefferson |
+| 9 | Horarios como sub-recurso: `/medicos/{id}/horarios` | Yefferson |
+| 10 | POST /citas: eliminar `id_medico_fk` del request | Yefferson |
+| 11 | Estado `"No asistió"` eliminado | Yefferson |
+| 12 | `fecha_consulta` en consultas → `fecha` via JOIN con citas | Yefferson |
+| 13 | historias_clinicas: agregar `antecedentes_personales` y `antecedentes_familiares` | Vanesa |
+| 14 | signos_vitales: agregar GET por `id_historia_clinica_fk` | Vanesa |
+| 15 | PUT `/historias_clinicas/{id}` nuevo endpoint | Vanesa |
